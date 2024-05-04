@@ -44,6 +44,17 @@ download_data <- function(bootstrapped_data = FALSE){
   if(file.exists(download_path$local_path)){message('Success!')}
 }
 
+# load bootstrap files
+boot_load <- function(){
+  if(!file.exists('Bootstraps')){
+    stop('Bootstraps folder does not exist. Please download the data first using download_data.R script or
+         manually through the OSF project page https://osf.io/ra38k/')
+  }
+  
+  message('Loading pre-computed bootstrap...')
+}
+
+
 
 ################################################################################
 # THEMES & AESTHETICS
@@ -273,6 +284,15 @@ calculate_cosine_similarity <- function(vec1, vec2) {
   sum(vec1 * vec2) / (sqrt(sum(vec1^2)) * sqrt(sum(vec2^2)))
 }
 
+# for finding closest points between two locations
+find_closest_point <- function(lon, lat, dataset) {
+  d <- geosphere::distVincentySphere(c(lon, lat), cbind(dataset$lon, dataset$lat))
+  closest_index <- which.min(d)
+  city_name <- dataset[closest_index, ]$city_name
+  nodeID <- dataset[closest_index, ]$nodeID
+  return(tibble(nodeID, city_name, distance = min(d)))
+}
+
 
 ################################################################################
 # NETWORK
@@ -459,7 +479,7 @@ plot_save <- function(plot_name, size = c(183, 100), pdf = TRUE){
       width = size[1],
       height = size[2],
       units = 'mm',
-      path = 'submission/Plots',
+      path = 'Plots',
       dpi = 'print',
       device = 'pdf'
     )
@@ -470,7 +490,7 @@ plot_save <- function(plot_name, size = c(183, 100), pdf = TRUE){
     width = size[1],
     height = size[2],
     units = 'mm',
-    path = 'submission/Plots',
+    path = 'Plots',
     dpi = 'print',
     device = 'png'
   )
