@@ -15,6 +15,36 @@ library(igraph)
 library(patchwork)
 library(viridis)
 
+
+################################################################################
+# DOWNLOAD DATA
+################################################################################
+# helper function to fetch data from OSF
+download_data <- function(bootstrapped_data = FALSE){
+  project <- osf_retrieve_node("ra38k")
+  osf_files <- osf_ls_files(project)
+  
+  # if Bootstraps or Dataset folder already exists, stop and make error
+  current_dir <- list.files(getwd())
+  if('Bootstraps' %in% current_dir | 'Dataset' %in% current_dir){
+    stop('Either Dataset or Bootstraps folder already exists in the current directory. Please remove them before downloading again.')
+  } else {
+    if(bootstrapped_data){
+      filtered_list <- osf_files
+    } else {
+      filtered_list <- subset(osf_files, name == 'Dataset')
+    }
+  }
+  
+  # filter the type of data 
+  message('Download starting')
+  download_path <- osf_download(filtered_list, progress = TRUE)
+  
+  # verify the file was downloaded locally
+  if(file.exists(download_path$local_path)){message('Success!')}
+}
+
+
 ################################################################################
 # THEMES & AESTHETICS
 ################################################################################
