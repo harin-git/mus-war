@@ -8,7 +8,7 @@ Please contact us if you run into any issues.
 
 Interactive visualizations of figures in the paper can be found on [our website](www.musicdiscover.net)
 
-![](images/interactive_ani-01.gif){width="441"}
+![](images/interactive_ani-01.gif)
 
 ## Downloading the data
 
