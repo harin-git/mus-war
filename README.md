@@ -4,6 +4,12 @@ This repo contains code for the paper "**Music discovery patterns reveal cultura
 
 Please contact us if you run into any issues.
 
+## Interactive visualizations
+
+Interactive visualizations of figures in the paper can be found on [our website](www.musicdiscover.net)
+
+![](images/interactive_ani-01.gif){width="441"}
+
 ## Downloading the data
 
 To download the data, the helper function `download_data.R` allows to automatically fetch data from the OSF repository using the [osfr](https://cran.r-project.org/web/packages/osfr/vignettes/getting_started.html) R package. You can define which type of data to download, corresponding directories will be created, and the download process will begin.
@@ -14,7 +20,7 @@ You can also manually download the data from OSF by following [this link](https:
 
 All analyses in the paper can be reproduced with the code posted here, in R and Python. Most of our computations are done using bootstrap simulations, which is often computationally costly to compute. Therefore, pre-computed bootstrap files are also available for downloaded by specifying `bootstrap_files = TRUE` using `download_data.R` . This will initiate in creating a directory called `/Boostraps` and download the bootstrap files.
 
-All analyses scripts begin by loading study-wide packages and high level functions through `utils.R`. These packages included in the script needs to be first installed to fully reproduce all analyses. See file `session_info.txt` for full specification used of the researcher.
+All analyses scripts begin by loading study-wide packages and high level functions through `utils.R`. These packages included in the script needs to be first installed to fully reproduce all analyses. See file `session_info.txt` for full specification used by the researcher.
 
 All visualizations are produced using `ggplot`, with the exception of diffusion networks, which was visualized using [Gephi](https://gephi.org/). Some figure elements are augmented manually (e.g., adding some labels) and/or include illustrations.
 

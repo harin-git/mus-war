@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+Dataset/*
+Bootstraps/*
+Animations
+Plots/*
+final_figures.key
+mus-war-sandbox.Rproj
