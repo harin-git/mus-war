@@ -1,5 +1,5 @@
 #' Perform dimensionality reduction using UMAP and compare the distribution density pre vs. post-invasion 
-#' Lyrical features vectors are extracted from LLM (see Extra/extraction_word_embedding.R script)
+#' Lyrical features vectors are extracted from LLM (see Analysis/Extra/extraction_word_embedding.R script)
 #' Acoustic features are extracted using Essentia (https://essentia.upf.edu)
 #' Related to Fig.2 in paper
 

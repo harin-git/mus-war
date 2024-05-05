@@ -30,14 +30,46 @@ To infer the diffusion network, [NETINF](https://snap.stanford.edu/netinf/) need
 
 ## Codebook
 
+### General
+
 `nodeID` = unique identifier given to city
 
-`track_id` = unique identifier given to song
+`trackID` = unique identifier given to song
 
 `pre_post` = whether the dates are pre or post-invasion period (reference date = 2022-02-24)
 
-`source` & `target` = used to identify the undirected and directed relations between cities (nodes). Corresponds to nodeID.
+`source` & `target` = used to identify the undirected and directed relations between cities (nodes). Corresponds to nodeID
 
-`weight` = strength of the edge, defined by the frequency it appears in bootstraps.
+`weight` = strength of the edge, defined by the frequency it appears in bootstraps
 
-\*please contact if any data headings or format is unclear
+### Semantic features
+
+`embedding` = feature vectors extracted from
+
+`lyrics_language` =
+
+### Acoustic features
+
+`loudness` =
+
+`dynamic_complexity` =
+
+`spectral_complexity` =
+
+`spectral_centroid` =
+
+`spectral_energy` =
+
+`zcr` = zero-crossing-rate, acoustic feature used for
+
+`bpm` =
+
+`onset_rate` =
+
+`chord_change_rate` =
+
+`major_minor` =
+
+`mfcc` =
+
+\*please contact if any of data headings or format is unclear
