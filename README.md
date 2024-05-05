@@ -44,32 +44,32 @@ To infer the diffusion network, [NETINF](https://snap.stanford.edu/netinf/) need
 
 ### Semantic features
 
-`embedding` = feature vectors extracted from
+`embedding` = word vectors extracted from Open AI embedding
 
-`lyrics_language` =
+`lyrics_language` = identified language of lyrics using [fasttext](https://fasttext.cc/docs/en/language-identification.html)
 
 ### Acoustic features
 
-`loudness` =
+\*Full description of acoustic features can be found at [Essentia website](https://essentia.upf.edu/algorithms_reference.html).
 
-`dynamic_complexity` =
+`loudness` = EBU R128 loudness descriptors of an audio signal
 
-`spectral_complexity` =
+`dynamic_complexity` = average absolute deviation from the global loudness level estimate on the dB scale
 
-`spectral_centroid` =
+`spectral_complexity` = number of peaks in the input spectrum
 
-`spectral_energy` =
+`spectral_centroid` = the centroid is computed by dividing the norm of the resulting signal by the norm of the input signal. The centroid is given in hertz
 
-`zcr` = zero-crossing-rate, acoustic feature used for
+`spectral_energy` = energy ratio of the specified band over the total energy
 
-`bpm` =
+`zcr` = number of sign changes between consecutive signal values divided by the total number of values
 
-`onset_rate` =
+`bpm` = beats per minute
 
-`chord_change_rate` =
+`onset_rate` = number of onsets per second and their position in time for an audio signal
 
-`major_minor` =
+`chord_change_rate` = rate at which detected chords change
 
-`mfcc` =
+`major_minor` = detected major or minor key
 
-\*please contact if any of data headings or format is unclear
+`mfcc` = mel-frequency cepstrum coefficients of a spectrum by taking means across 12 bins
