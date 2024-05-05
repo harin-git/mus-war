@@ -469,6 +469,9 @@ get_edges_within_regions = function(all_regions, pre_network, post_network){
 ################################################################################
 # for saving plots. Defaults to making both PNG and PDF versions.
 plot_save <- function(plot_name, size = c(183, 100), pdf = TRUE){ 
+  # if no dir called Plots, make one
+  if(!dir.exists('Plots')){dir.create('Plots')}
+  
   # default size for journal is 183mm wide
   message(sprintf('saving plot to: %s', plot_name))
   
