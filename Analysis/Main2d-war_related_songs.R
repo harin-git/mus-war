@@ -1,4 +1,4 @@
-#' Proportion of war-related songs in Ukraine and Russia.
+#' Proportion of war-related songs in Ukraine and Russia
 #' Word embedding vectors extracted from tokenised words of lyrics (see 'Analysis/Extra/extracting_word_embedding.R' script)
 #' is used to find the closest neighbour to the seed word "war".
 #' Related to Fig. 2 in the paper
