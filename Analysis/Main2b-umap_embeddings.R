@@ -14,7 +14,7 @@ SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 # load the dataset
 song_meta <- read_rds('Dataset/meta/song_metadata.rds')
-lyrics_embedding <- read_rds('Dataset/lyrics/ukraine_russia_lyrics_embedding.rds')
+lyrics_embedding <- read_rds('Dataset/lyrics/UA_RU_lyrics_embedding.rds')
 
 # computes the KDE estimation in 2D space
 get_kde <- function(df, lyrics_lang = c('uk', 'ru'), type = c('pre', 'post'), h = 1, nbin = 512){

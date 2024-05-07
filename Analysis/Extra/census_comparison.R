@@ -10,7 +10,7 @@ library(rnaturalearth) # for world map
 # PREPARATION
 ################################################################################
 # determine country of analysis
-COUNTRY_CODE <- 'RU'
+COUNTRY_CODE <- 'UA'
 NQUANTILE <- 4
 
 # load data
@@ -26,6 +26,7 @@ switch(COUNTRY_CODE,
          CENSUS$local_prop <- CENSUS$ukranians
          CENSUS$local_lang_prop <- CENSUS$ukranian_lang_prop
          COLOR_GRADIENT <- c(UKRAINE_COLOUR, UKRAINE_COLOUR2)
+         MUSIC <- read_rds('Dataset/lyrics/ukranian_lyrics_change_by_city.rds')
        },
        RU = {
          WHERE <- 'Russian'
@@ -37,8 +38,11 @@ switch(COUNTRY_CODE,
          # calculate russian proportion
          CENSUS <- CENSUS %>% mutate(local_prop = n/nationality_indicated_population*100)
          COLOR_GRADIENT <- c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2)
+         MUSIC <- read_rds('Dataset/lyrics/russian_lyrics_change_by_city.rds')
        }
 )
+local_songs_city <- MUSIC %>%
+  left_join(city_meta %>% select(nodeID, city_name, lat, lon))
 
 # what is the range of ethnic groups?
 print(paste('min', min(CENSUS$local_prop) %>% signif(2)))
@@ -95,6 +99,86 @@ if(COUNTRY_CODE == 'UA'){
     scale_fill_gradient(low = COLOR_GRADIENT[1], high = COLOR_GRADIENT[2], guide = F)
   
   plot_save('SI/ukraine_census_language_map', c(120, 100))
+}
+
+
+################################################################################
+# CORRELATION WITH MUSIC
+################################################################################
+city_points <- local_songs_city %>%
+  select(city_name, lon, lat) %>%
+  sf::st_as_sf(coords = c("lon", "lat"), crs = CRS)
+
+mapping <- sf::st_within(city_points, region) %>% as.character() %>% as.numeric()
+mapped_cities <- region[mapping, ] %>%
+  as_tibble() %>%
+  select(iso_3166_2) %>%
+  mutate(nodeID = local_songs_city$nodeID,
+         city_name = local_songs_city$city_name) %>%
+  na.omit()
+
+city_music <- mapped_cities %>%
+  left_join(MUSIC)
+
+# join with ethnic data
+music_ethnic <- city_music %>%
+  left_join(plot_data)
+
+music_ethnic <- switch(COUNTRY_CODE,
+                       UA = {
+                         music_ethnic %>%
+                           mutate(
+                             city_type = case_when(
+                               city_name %in% c('Sebastopol', 'Donetsk', 'Kerch', 'Luhansk', 'Mariupol') ~ 'Occupied',
+                               TRUE ~ 'Not occupied'
+                             )
+                           )
+                       },
+                       RU = {
+                         music_ethnic %>%
+                           mutate(city_type = ifelse(local_prop > 50, 'non-minority', 'minority')) %>%
+                           filter(!is.na(city_type))
+                       })  
+
+# test correlation
+message('Ethnic results...')
+cor_result <- corr.test(music_ethnic %>% select(pre_post_change, local_prop), adjust = 'bonferroni', method = 'spearman')
+print(cor_result, short=FALSE) 
+print(cor_result$stars, quote=FALSE, short=FALSE)
+
+if(COUNTRY_CODE == 'UA'){
+  message('Language results...')
+  cor_result <- corr.test(music_ethnic %>% select(pre_post_change, local_lang_prop), adjust = 'bonferroni', method = 'spearman')
+  print(cor_result, short=FALSE) 
+  print(cor_result$stars, quote=FALSE, short=FALSE)
+}
+
+
+# plot the correlations between music and census
+music_ethnic %>%
+  ggplot(aes(local_prop, pre_post_change * 100)) +
+  geom_smooth(method = 'glm', colour = 'gray50') +
+  geom_point(aes(colour = city_type), size = 1, alpha = 0.8) +
+  ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman') +
+  switch (COUNTRY_CODE,
+          UA = labs(x = 'Ethnic Ukranian (%)', y = 'Local music (%)'),
+          RU = labs(x = 'Ethnic Russian (%)', y = 'Local music (%)') 
+  ) +
+  scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = F)
+
+plot_save(COR_SAVE, c(80, 80))
+
+# if Ukraine, plot also the language correlation
+if(COUNTRY_CODE == 'UA'){
+  music_ethnic %>%
+    ggplot(aes(local_lang_prop, pre_post_change * 100)) +
+    geom_smooth(method = 'glm', colour = 'gray50') +
+    geom_point(aes(colour = city_type), size = 1, alpha = 0.8) +
+    ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman') +
+    labs(x = 'Ukrainian speakers (%)', y = 'Local music (%)') +
+    scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = F)
+  
+  plot_save('SI/ukraine_music_census_language', c(80, 80))
 }
 
 

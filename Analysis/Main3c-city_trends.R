@@ -64,7 +64,9 @@ if(SIMULATION){
 city_agg <- city_boot_output %>%
   group_by(country_code, city_name, nodeID, date, lyrics_lang) %>%
   reframe(get_boot_mean_ci(prop, 'boot')) %>%
-  ungroup() 
+  ungroup() %>%
+  mutate(date = as.Date(date))
+
 
 plot_city_level <- function(country){
   switch(country,
@@ -92,7 +94,11 @@ plot_city_level <- function(country){
   print(paste('max', max(city_agg$boot_m) %>% signif(2)))
   
   plot_cities <- city_agg %>%
-    filter(country_code == country, lyrics_lang == lang) %>%
+    filter(country_code == country, lyrics_lang == lang)
+  
+  # fill 0 for missing dates
+  plot_cities <- plot_cities %>%
+    complete(city_name, date, fill = list('boot_m' = 0)) %>%
     mutate(city_type = ifelse(city_name %in% sub_cities, city_categories[1], city_categories[2]))
   
   # plot
@@ -104,6 +110,8 @@ plot_city_level <- function(country){
     labs(x = '', y = 'Local music (%)') +
     scale_colour_manual(values = colour_pal) + 
     scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+    # make sure it doesn't go below 0
+    ylim(0, 60) +
     theme_classic() +
     theme(legend.position = 'None')
 }
@@ -122,12 +130,15 @@ plot_save('Main/city_level_local_music', c(250, 70))
 ## UKRAINE STATS
 ua_cities <- city_boot_output %>%
   ungroup() %>%
-  filter(lyrics_lang == 'uk', country_code == 'UA') %>%
-  mutate(occupy = ifelse(city_name %in%  c('Sebastopol', 'Donetsk', 'Kerch', 'Luhansk', 'Mariupol'), 'y', 'n'))
+  filter(lyrics_lang == 'uk', country_code == 'UA')
+ua_cities <- ua_cities %>%
+  group_by(pre_post) %>%
+  complete(city_name, date, boot, fill = list(prop = 0))
+ua_cities <- ua_cities %>%
+  mutate(occupy = ifelse(city_name %in%  c('Sebastopol', 'Donetsk', 'Kerch', 'Luhansk'), 'y', 'n'))
 
 # general homogeneity of change in Ukraine
 ua_cities %>%
-  # filter(pre_post == 'post') %>%
   group_by(pre_post, boot) %>%
   summarise(sd = sd(prop)) %>%
   reframe(get_boot_mean_ci(sd, 'sd'))
@@ -165,14 +176,33 @@ city_boot_output %>%
   reframe(get_boot_mean_ci(sd, 'sd'))
 
 # change by russian cities
-russia_change <- city_boot_output %>%
+ru_cities <- city_boot_output %>%
   ungroup() %>%
-  filter(country_code == 'RU') %>%
-  select(city_name, pre_post, prop) %>%
-  pivot_wider(names_from = pre_post, values_from = prop) %>%
-  group_by(city_name) %>%
-  summarise(get_t_stat(post %>% unlist(), pre %>% unlist())) %>%
-  arrange(mean_diff)
+  filter(lyrics_lang == 'ru', country_code == 'RU')
+
+# categorise the region as minority 
+ru_census <- read.csv('Dataset/census/russia_census_city_mapped.csv')
+ru_census <- ru_census %>% mutate(city_type = ifelse(local_prop < 50, 'min', 'notmin'))
+sub_cities <- ru_census[ru_census$city_type == 'min', 'city_name']
+ru_cities <- ru_cities %>%
+  mutate(city_type = ifelse(city_name %in% sub_cities, 'min', 'notmin'))
+
+# aggregate by city
+ru_agg <- ru_cities %>%
+  group_by(city_type, city_name, pre_post) %>%
+  summarise(m = mean(prop)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = pre_post, values_from = m)
+
+# pre post diff
+ru_agg <- ru_agg %>%
+  mutate(pre_post_diff = post - pre)
+
+ru_agg %>%
+  select(pre_post_diff, city_type) %>%
+  pivot_wider(names_from = city_type, values_from = pre_post_diff) %>%
+  summarise(get_t_stat(min %>% unlist(), notmin %>% unlist()))
+
 
 # mean decrease in russia
 russia_change_mean <- city_boot_output %>%

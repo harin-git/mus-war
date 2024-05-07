@@ -63,7 +63,7 @@ if(SIMULATION){
 ################################################################################
 # LYRICS TOKENISATION
 ################################################################################
-if(STIMULATE){
+if(SIMULATION){
   filtered_lyrics <- lyrics %>% filter(!is.na(cleaned_lyrics), country_code %in% c('RU', 'UA'))
   
   # make a cleaned token table of all lyrics
@@ -77,7 +77,7 @@ if(STIMULATE){
 ################################################################################
 n_boot <- 1000
 
-if(STIMULATE){
+if(SIMULATION){
   output = list()
   for (n in nclosest) {
     # take the top N war words with the highest cosine similarity
@@ -152,8 +152,9 @@ war_traj_cor <- war_traj %>%
   select(country_code, date, boot_m) %>%
   pivot_wider(names_from = country_code, values_from = boot_m)
 
-cor.test(war_traj_cor$UA, war_traj_cor$date %>% as.numeric())
-cor.test(war_traj_cor$RU, war_traj_cor$date %>% as.numeric())
+cor_result <- corr.test(war_traj_cor %>% mutate(date = as.numeric(date)), adjust = 'bonferroni', method = 'pearson')
+print(cor_result, short=FALSE) 
+print(cor_result$stars, quote=FALSE, short=FALSE)
 
 # save plot for main figure
 if(!control){

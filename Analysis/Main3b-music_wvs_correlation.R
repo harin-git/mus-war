@@ -93,13 +93,9 @@ plot_data_agg <- switch (COUNTRY_CODE,
 # CORRELATIONS
 #######################################s#########################################
 # test correlation
-pc1_cor <- cor.test(plot_data_agg$abs_percent_change, plot_data_agg$PC1, method = 'spearman')
-pc2_cor <- cor.test(plot_data_agg$abs_percent_change, plot_data_agg$PC2, method = 'spearman')
-pc3_cor <- cor.test(plot_data_agg$abs_percent_change, plot_data_agg$PC3, method = 'spearman')
-
-message(sprintf('PC1: rho = %s, p = %s', pc1_cor$estimate,  pc1_cor$p.value))
-message(sprintf('PC2: rho = %s, p = %s', pc2_cor$estimate,  pc2_cor$p.value))
-message(sprintf('PC3: rho = %s, p = %s', pc3_cor$estimate,  pc3_cor$p.value))
+cor_result <- corr.test(plot_data_agg %>% select(abs_percent_change, PC1:PC3), adjust = 'bonferroni', method = 'spearman')
+print(cor_result, short=FALSE) 
+print(cor_result$stars, quote=FALSE, short=FALSE) 
 
 # plot the correlation
 message(sprintf('Plotting the correlation between local music and PCA for %s', COUNTRY_CODE))
