@@ -4,6 +4,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 
+
 ################################################################################
 # PREPARATION
 ################################################################################
@@ -48,6 +49,7 @@ ua_joined <- ua_ru %>% select(-pre_post) %>% left_join(pre_post_songs)
 acoustic_joined <- ua_joined %>% left_join(acoustic_data)
 acoustic_joined <- acoustic_joined %>%
   filter((country_code == 'RU' & lyrics_language == 'ru') | (country_code == 'UA' & lyrics_language == 'uk'))
+
 
 ################################################################################
 # CHANGE IN MUSIC FEATURES
@@ -120,3 +122,4 @@ acoustic_diff %>%
   theme(legend.position = 'none')
 
 plot_save('Main/acoustic_feature_analyses', c(90, 50))
+

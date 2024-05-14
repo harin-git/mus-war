@@ -6,10 +6,11 @@ source('utils.R')
 require(sf) # for spatial mapping
 require(psych) # for correlation test
 
+
 ################################################################################
 # PREPARATION
 ################################################################################
-COUNTRY_CODE <- 'RU'
+COUNTRY_CODE <- 'UA'
 GLOBAL <- TRUE # when true, use the global PC results, otherwise do separetely for UA and RU
 
 city_meta <- read_rds('Dataset/meta/city_metadata.rds')
@@ -48,6 +49,7 @@ switch(COUNTRY_CODE,
 
 # if using global loadings, override with global PCA results
 if(GLOBAL){PCA <- read_rds('Dataset/wvs/global_wvs_pca_loadings.rds')}
+
 
 ################################################################################
 # MATCHING
@@ -124,8 +126,5 @@ for (i in 1:3) {
       labs(x = 'Local music (%)', y = PC)
     plot_save(sprintf('SI/%s_%s_%s_correlation', COUNTRY_CODE, 'music', PC), c(40, 50))
   }
-  
-  
 }
-
 

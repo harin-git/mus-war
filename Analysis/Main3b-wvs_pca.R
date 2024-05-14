@@ -13,11 +13,13 @@ require(plotly) # plot 3D PCAs
 require(proxy) # for cosine similarity calculations
 require(cowplot)
 
+
 ################################################################################
 # DATA PREPARATION
 ################################################################################
 city_meta <- read_rds("Dataset/meta/city_metadata.rds")
 wvs <- read_rds('Dataset/wvs/clean_wvs.rds')
+
 
 ################################################################################
 # FUNCTIONS
@@ -65,6 +67,7 @@ explore_pca <- function(data, cnt, topN){
     loadings =  pca_res$rotation[, 1:3]
   ))
 }
+
 
 ################################################################################
 # MAP PROJECTION

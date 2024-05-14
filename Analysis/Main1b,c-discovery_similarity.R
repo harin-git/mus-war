@@ -4,6 +4,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 
+
 ################################################################################
 # DATA PREPARATION
 ################################################################################
@@ -19,6 +20,7 @@ regions <- city_region$worldbank_region %>% unique() %>% sort()
 
 # join the data
 joined_data <- chart_data %>% ungroup() %>% left_join(city_region)
+
 
 ################################################################################
 # BOOTSTRAP DISCOVERY SIMILARITY BY DAY
@@ -181,6 +183,7 @@ decline_gam %>%
   group_by(window) %>%
   reframe(get_boot_mean_ci(coef %>% unlist(), 'coef'))
 
+
 ################################################################################
 # EFFECT SIZE OF CHANGE
 ################################################################################
@@ -233,6 +236,4 @@ plot_save('Main/within_region_discovery_similarity_effect_size', c(100, 80))
 # make binded plot
 gam_change_plot + region_change_effect_plot + plot_layout(widths = c(2.5, 1))
 plot_save('Main/within_region_discovery_similarity_bind', c(183, 60))
-
-
 

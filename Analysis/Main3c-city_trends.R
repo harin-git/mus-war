@@ -4,6 +4,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 
+
 ################################################################################
 # PREPARATION
 ################################################################################
@@ -165,7 +166,9 @@ mario <- city_boot_output %>%
 mario <- mario %>%
   group_by(month) %>%
   reframe(get_boot_mean_ci(prop, 'boot'))
+
 mario
+
 
 ## RUSSIAN STATS
 # general homogeneity of change in Russia
@@ -203,7 +206,6 @@ ru_agg %>%
   pivot_wider(names_from = city_type, values_from = pre_post_diff) %>%
   summarise(get_t_stat(min %>% unlist(), notmin %>% unlist()))
 
-
 # mean decrease in russia
 russia_change_mean <- city_boot_output %>%
   filter(country_code == 'RU') %>%
@@ -216,5 +218,4 @@ russia_change_mean <- city_boot_output %>%
 
 russia_change_mean %>%
   reframe(get_boot_mean_ci(cohensD, 'd'))
-  
 

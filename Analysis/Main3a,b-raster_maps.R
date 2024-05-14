@@ -8,6 +8,7 @@ require(lintr) # code linting
 require(sf) # spatial data handling
 require(rnaturalearth) # country borders geometries from naturalearth.org
 
+
 ################################################################################
 ## SETTINGS
 ################################################################################
@@ -24,6 +25,7 @@ crs <-  "+proj=longlat +datum=WGS84"
 # parameters for Kernel smoothing
 Dx = 0.1
 l = 1
+
 
 ################################################################################
 ## DATA
@@ -45,6 +47,7 @@ switch(country,
          colour_gradient <- c(RUSSIAN_COLOUR2, RUSSIAN_COLOUR)
        }
 )
+
 # if using global loadings, override with global PCA results
 if(global){cities <- read_rds('Dataset/wvs/global_wvs_pca_loadings.rds')}
 
@@ -69,6 +72,7 @@ joined_data <- joined_data %>%
       mutate(., value = ntile(!!sym(pc), nquantile))
     }
   }
+
 
 ################################################################################
 ## MAPPING FUNCTIONS
@@ -232,7 +236,6 @@ point_data <- city_data %>%
   mutate(city_category = ifelse(!is.na(fcode) & fcode == 'PPLC', 'capital', 'non-capital')) %>%
   mutate(city_category = factor(city_category, levels = c('non-capital', 'capital')))
 
-
 # plot the map
 ggplot() +
   geom_raster(data = raster_dt, aes(x = lon, y = lat, fill = value)) +
@@ -257,6 +260,4 @@ if(type == 'wvs' & pc == 'PC3') {
 } else {
   plot_save(sprintf('SI/%s_%s_%s_map', country, type, pc), c(180, 120))
 }
-
-
 

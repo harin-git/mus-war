@@ -4,6 +4,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 
+
 ################################################################################
 # PREPARATION
 ################################################################################
@@ -146,7 +147,7 @@ lyrics_long <- long_trend_plot_stat(long_boot_output, 'SI', study_window = FALSE
 ################################################################################
 # TREND STATS
 ################################################################################
-# compute the pre vs. post increase/descrease percentage. Use cohen's d for effect size measure
+# compute the pre vs. post increase/decrease percentage. Use cohen's d for effect size measure
 lyrics_change <- long_boot_output %>%
   filter(date >= WAR_START - 90, date <= WAR_START + 90) %>%
   mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post')) 

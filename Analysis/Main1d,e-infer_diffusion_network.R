@@ -9,6 +9,7 @@ library(doParallel) # for parallel processing
 library(foreach)
 library(progressr)
 
+
 ################################################################################
 ## DATA PREPARATION
 ################################################################################
@@ -17,6 +18,7 @@ chart_data <- read_rds('Dataset/chart/study_set_chart.rds')
 # make node table
 nodetable <- chart_data %>% select(ID = nodeID, country_code, Label = city_name) %>% distinct(ID, Label, country_code)
 nodetable %>% write.csv('netinf/node_table.csv', row.names = FALSE)
+
 
 ################################################################################
 ## SETTINGS
@@ -40,7 +42,7 @@ DT <- chart_data %>% filter(pre_post == INVASION_PERIOD)
 new_dir_path <- file.path(SAVE_PATH, SAVE_NAME)
 if(!dir.exists(new_dir_path)){
   message(sprintf("creating output directory at %s", new_dir_path))
-  dir.create(new_dir_path)
+  dir.create(new_dir_path, recursive = TRUE)
 } else {
   message('Output directory already exists')
 }
@@ -76,6 +78,4 @@ for(i in i:N_BOOT) {
   pb$tick()
 }
 
-
-
-
+  

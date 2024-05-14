@@ -4,6 +4,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 
+
 ################################################################################
 # PREPARATION
 ################################################################################
@@ -22,6 +23,7 @@ post_edge <- read_rds('Bootstraps/post_netinf_boot1000.rds')
 # if TRUE, the trimming of dense edges is performed
 trim_edge <- TRUE
 trim_percent <- 5  # if trim_edge is TRUE, the edges below the percentage threshold is treated as noise and excluded
+
 
 ################################################################################
 # BOOTSTRAP WITHIN AND ACROSS CONNECTION CHANGES
@@ -313,7 +315,6 @@ soviet_europe_long %>%
 # save plot for SI
 plot_save('SI/outgoing_incoming_connections_w_europe', c(70, 100))
 
-
 # report stats at the country level mean
 soviet_europe_connection %>%
   group_by(country_code, boot) %>%
@@ -338,6 +339,7 @@ soviet_europe_agg %>%
 library(maps)
 library(eurostat)
 library(sf)
+library(giscoR)
 
 # Obtain map data for Europe
 euromap <- get_eurostat_geospatial(resolution = 10, 
@@ -385,3 +387,4 @@ SHP_27 %>%
   scale_colour_manual(values = c(UKRAINE_COLOUR, RUSSIAN_COLOUR), guide = F)
 
 plot_save('SI/map_europe_cities_post_soviet_connection', c(183, 183))
+

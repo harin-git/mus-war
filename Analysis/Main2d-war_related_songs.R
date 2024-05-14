@@ -7,6 +7,7 @@
 source('utils.R')
 library(quanteda) # for text processing
 
+
 ################################################################################
 # SETUP
 ################################################################################
@@ -31,6 +32,7 @@ word_embedding <- read_rds('Dataset/lyrics/UA_RU_word_embedding.rds')
 
 # define war related words
 war_words <- c('war')
+
 
 ################################################################################
 # SEMANTIC SIMILARITY WITH "WAR"
@@ -60,6 +62,8 @@ if(SIMULATION){
   # what are the top words?
   if(!control){war_embed_sim[1:5, 1]}
 }
+
+
 ################################################################################
 # LYRICS TOKENISATION
 ################################################################################
@@ -71,6 +75,7 @@ if(SIMULATION){
   tokens <- tokens_remove(tokens, pattern = stopwords("en"), padding = FALSE)
   tokens_stemmed <- tokens_wordstem(tokens, language = "english")
 }
+
 
 ################################################################################
 # BOOTSTRAP PROPORTION OF WAR RELATED SONGS
@@ -162,10 +167,5 @@ if(!control){
 } else {
   plot_save('SI/different_closest_words_for_war_related_songs', c(183, 80))
 }
-
-
-
-
-
 
 

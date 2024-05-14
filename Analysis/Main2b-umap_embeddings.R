@@ -6,6 +6,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 require(uwot) # for UMAP
+ 
 
 ################################################################################
 # PREPARATION
@@ -166,6 +167,7 @@ plot_save('Main/umap_ukrainian_lyrics', c(150, 80))
 plot_umap_density(umap_lyrics, ru_lyrics_kde, 'RU')
 plot_save('Main/umap_russian_lyrics', c(150, 80))
 
+
 ## JSD DISTANCE
 # compute the KDE differences
 n_boot <- 1000
@@ -182,7 +184,6 @@ if(SIMULATION){
   bind_lyrics_kde_boot <- read_rds(sprintf('Bootstraps/umap_lyrics_kde_jsd_boot%s.rds', n_boot))
 }
 
-
 # aggregate and compare the two distribution difference
 kde_lyrics_boot_agg <- bind_lyrics_kde_boot %>%
   group_by(country_code) %>%
@@ -197,6 +198,7 @@ bind_lyrics_kde_boot %>%
   select(country_code, estimate) %>%
   pivot_wider(names_from = country_code, values_from = estimate) %>%
   reframe(get_t_stat(UA %>% unlist(), RU %>% unlist()))
+
 
 ################################################################################
 # ACOUSTIC
@@ -250,6 +252,7 @@ plot_save('SI/umap_ukrainian_acoustic', c(150, 80))
 plot_umap_density(umap_acoustic, ru_acoustic_kde, 'RU', labels = TRUE)
 plot_save('SI/umap_russian_acoustic', c(150, 80))
 
+
 # compute the KDE differences
 n_boot <- 1000
 
@@ -279,3 +282,4 @@ bind_acoustic_kde_boot %>%
   select(country_code, estimate) %>%
   pivot_wider(names_from = country_code, values_from = estimate) %>%
   reframe(get_t_stat(UA %>% unlist(), RU %>% unlist()))
+
