@@ -114,24 +114,6 @@ plot_city_level <- function(country){
     ylim(0, 60) +
     theme_classic() +
     theme(legend.position = 'None')
-  
-  ggplot() +
-    geom_smooth(data = plot_cities %>% filter(city_type == 'Not occupied'),
-                aes(as.Date(date), boot_m, colour = city_type, group = city_name),
-                # linetype = ifelse(city_name == 'Mariupol', 'solid', 'dashed'),
-                se = FALSE, span = 1, size = 0.5) +
-    geom_smooth(data = subset(plot_cities, city_type == "Occupied"),
-                aes(as.Date(date), boot_m, colour = city_type, group = city_name,
-                    linetype = ifelse(city_name == 'Mariupol', 'solid', 'dashed')),
-                se = FALSE, span = 1, size = 0.5) +
-    geom_vline(xintercept = WAR_START, linetype = 'dashed') +
-    labs(x = '', y = 'Local music (%)') +
-    scale_colour_manual(values = colour_pal) +
-    scale_x_date(date_labels = "%b", date_breaks = "1 month") +
-    # make sure it doesn't go below 0
-    ylim(0, 60) +
-    theme_classic() +
-    theme(legend.position = 'None')
 }
 
 (ua_cities <- plot_city_level('UA'))
