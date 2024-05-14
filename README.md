@@ -1,6 +1,6 @@
 This repo contains code for the paper "**Music discovery patterns reveal cultural shifts following the 2022 Russian invasion of Ukraine**". To reproduce our analyses you will need some or all of these files.
 
-> All data and materials are publicly archived at [OSF](https://osf.io/ra38k/?view_only=32795758b14040cdb826d743023308fd) (for peer review only link), with the exception of song metadata which belongs to the relevant right holders. All analysis scripts are available at <https://github.com/harin-git/mus-war>.
+> All data and materials are publicly archived at [OSF](https://osf.io/ra38k), with the exception of song metadata which belongs to the relevant right holders. All analysis scripts are available at <https://github.com/harin-git/mus-war>.
 
 Please contact us if you run into any issues.
 
