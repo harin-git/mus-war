@@ -12,15 +12,15 @@ Interactive visualizations of figures in the paper can be found on [our website]
 
 ## Downloading the data
 
-To download the data, the helper function `download_data.R` allows to automatically fetch data from the OSF repository using the [osfr](https://cran.r-project.org/web/packages/osfr/vignettes/getting_started.html) R package. You can define which type of data to download, corresponding directories will be created, and the download process will begin.
+For faster performance, we recommend manually downloading all datasets (folders "Bootstraps" and "Dataset") from the OSF repository by following [this link](https://osf.io/ra38k/?view_only=32795758b14040cdb826d743023308fd). Once downloaded, unzip the folders and place them in the main working directory alongside the analysis scripts.
 
-You can also manually download the data from OSF by following [this link](https://osf.io/ra38k/?view_only=32795758b14040cdb826d743023308fd)
+You can also download the data using the helper function `download_data.R`, which allows to automatically fetch data from the OSF repository using the [osfr](https://cran.r-project.org/web/packages/osfr/vignettes/getting_started.html) R package. You can define which type of data to download, corresponding directories will be created, and the download process will begin.
 
 ## Reproducing the analyses and plots
 
-All analyses in the paper can be reproduced with the code posted here, in R and Python. Most of our computations are done using bootstrap simulations, which is often computationally costly to compute. Therefore, pre-computed bootstrap files are also available for downloaded by specifying `bootstrap_files = TRUE` using `download_data.R` . This will initiate in creating a directory called `/Boostraps` and download the bootstrap files.
+All analyses in the paper can be reproduced with the code posted here, in R and Python. Most of our computations are done using bootstrap simulations, which are often computationally costly. Therefore, pre-computed bootstrap files are available for downloaded by specifying `bootstrap_files = TRUE` using `download_data.R` . This will initiate in creating a directory called `/Boostraps` and download the bootstrap files.
 
-When running all analysis and reproducing the figure, `SIMULATION` parameter in scripts can be set to `FALSE` to bypass the bootstrap computation. Given the bootstrap data is downloaded, it will fetch the pre-computed bootstrap outcomes.
+When running all analyses and reproducing the figures, `SIMULATION` parameter in the scripts can be set to `FALSE` to bypass the bootstrap computation. Given the bootstrap data is downloaded, it will fetch the pre-computed bootstrap outcomes.
 
 All analyses scripts begin by loading study-wide packages and high level functions through `utils.R`. These packages included in the script needs to be first installed to fully reproduce all analyses. See file `session_info.txt` for full specification used by the researcher.
 
