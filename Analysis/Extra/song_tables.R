@@ -1,4 +1,4 @@
-#' Create Supplementary Information tables 2-4
+#' Create Supplementary Information Tables 2-4
 
 # load study-wide functions and global variables
 source('utils.R')
