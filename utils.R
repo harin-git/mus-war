@@ -195,14 +195,20 @@ get_t_stat <- function(group1, group2){
 }
 
 # for bootstrap confidence estimates
-get_boot_mean_ci <- function(x, var_name, obs_stat = 0, alpha = 0.05, ...){
+get_boot_mean_ci <- function(x, var_name, obs_stat = 0, p_parametric = TRUE, alpha = 0.05, ...){
   low <- alpha / 2
   high <- 1 - alpha / 2
-
-  # parametric p-value
-  z_score <- (mean(x) - obs_stat) / sd(x)
-  p <- signif(2 * pnorm(-abs(z_score)), 3)  # two-tailed
   
+  if(p_parametric){
+    # parametric p-value
+    z_score <- (mean(x) - obs_stat) / sd(x)
+    p <- signif(2 * pnorm(-abs(z_score)), 3)  # two-tailed
+  } else {
+    # non-parametric p-value using empirical CDF
+    ecdf_func <- ecdf(x)
+    p <- signif(2 * min(ecdf_func(obs_stat), 1 - ecdf_func(obs_stat)), 3)  # two-tailed
+  }
+
   # make t-stat labels
   p_labels <- ifelse(p >= 0.05, 'ns', ifelse(p < 0.001, '***', ifelse(p < 0.01, '**', '*')))
   

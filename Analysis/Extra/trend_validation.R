@@ -81,20 +81,20 @@ ua_seasons <- ua_seasons %>%
   reframe(get_boot_mean_ci(prop * 100, 'boot'))
 
 (ua_season_plot <- ua_seasons %>%
-  mutate(name = factor(name, levels = c('uk', 'ru'), labels = c('Ukranian', 'Russian')),
-         country_code = factor(country_code, labels = c('Ukraine'))) %>%
+  mutate(country_code = factor(country_code, labels = c('Ukraine'))) %>%
+  filter(name == 'uk') %>%
   ggplot(aes(as.Date(date), boot_m, group = window,linetype = window)) +
   geom_line() +
   geom_ribbon(aes(ymin = boot_lower_ci, ymax = boot_upper_ci), alpha = 0.3, linewidth = 0) +
-  scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "1 month") +
+  scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "2 month") +
   labs(x = '', y = 'Proportion') +
-  facet_wrap(~ name, nrow = 2) +
+  facet_wrap(~ country_code, nrow = 2) +
   geom_vline(xintercept = WAR_START, colour = 'gray') +
   theme(legend.position = 'none'))
 
 # other countries seasonal effects of Russian songs
 other_seasons <- seasons %>%
-  filter(country_code %in% c('RU', 'BY', 'KZ'), name == 'ru') %>%
+  filter(name == 'ru') %>%
   group_by(window, name) %>%
   # make fake year for 2023 to align the dates
   mutate(date = ifelse(window == '2022', date, date - 365))
@@ -104,19 +104,19 @@ other_seasons <- other_seasons %>%
   reframe(get_boot_mean_ci(prop * 100, 'boot'))
 
 (other_season_plot <- other_seasons %>%
-    mutate(country_code = factor(country_code, levels = c('RU', 'BY', 'KZ'), labels = c('Russia', 'Belarus', 'Kazakhstan'))) %>%
+    mutate(country_code = factor(country_code, levels = c('UA', 'RU', 'BY', 'KZ'), labels = c('Ukraine', 'Russia', 'Belarus', 'Kazakhstan'))) %>%
     ggplot(aes(as.Date(date), boot_m, group = window,linetype = window)) +
     geom_line() +
     geom_ribbon(aes(ymin = boot_lower_ci, ymax = boot_upper_ci), alpha = 0.3, linewidth = 0) +
-    scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "1 month") +
+    scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "2 month") +
     labs(x = '', y = 'Proportion') +
     geom_vline(xintercept = WAR_START, colour = 'gray') +
     facet_wrap(~ country_code, nrow = 1) +
     theme(legend.position = 'none'))
 
 # bind the two seasonal trends for SI
-ua_season_plot + other_season_plot + plot_layout(widths = c(1.5, 3))
-plot_save('SI/seasonal_effects_lyrics_trend', c(183, 80))
+ua_season_plot + other_season_plot + plot_layout(widths = c(1, 4))
+plot_save('SI/seasonal_effects_lyrics_trend', c(183, 50))
 
 ## Report the correlation stats
 ua_season_cor <- ua_seasons %>%
@@ -223,21 +223,20 @@ make_comparison_plot <- function(country, lang){
     # coord_flip() +
     labs(x = "Cohen's d", y = '') +
     theme(axis.text.y = element_blank(),
-          axis.ticks.y = element_blank())
-  
-  # Conditionally add facets
-  if (country[1] == 'Ukraine') {
-    p <- p + facet_wrap(~ language, nrow = 2)
-  } else {
-    p <- p + facet_wrap(~ country_code, nrow = 1)
-  }
+          axis.ticks.y = element_blank()) +
+    facet_wrap(~ country_code, nrow = 1)
+  p
 }
 
-(ukraine_random_flux <- make_comparison_plot('Ukraine', c('Ukranian', 'Russian')))
-(other_random_flux <- make_comparison_plot(c('Russia', 'Belarus', 'Kazakhstan'), c('Russian')))
+(ukraine_random_flux <- make_comparison_plot('Ukraine', c('Ukranian')))
+(other_random_flux <- make_comparison_plot(c('Ukraine', 'Russia', 'Belarus', 'Kazakhstan'), c('Russian')))
 
 # bind the random flux plots and save as SI figure
-ukraine_random_flux + other_random_flux + plot_layout(widths = c(1.5, 3))
-plot_save('SI/random_fluctuations_lyrcs_trend', c(183, 80))
+ukraine_random_flux + other_random_flux + plot_layout(widths = c(1, 4))
+plot_save('SI/random_fluctuations_lyrcs_trend', c(183, 50))
 
-
+# report p-stat by comparing the observed effect against the bootstrap distribution
+fluctuation_output %>%
+  left_join(lyrics_change_effect %>% select(country_code, language = name, observed_d = cohensD)) %>%
+  group_by(country_code, language) %>%
+  reframe(get_boot_mean_ci(cohensD, 'm', obs_stat = observed_d[1], p_parametric = FALSE))
