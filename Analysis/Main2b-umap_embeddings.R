@@ -192,6 +192,12 @@ kde_lyrics_boot_agg <- bind_lyrics_kde_boot %>%
 # report JSD stats
 kde_lyrics_boot_agg
 
+# get group level difference
+bind_lyrics_kde_boot %>%
+  select(country_code, estimate) %>%
+  pivot_wider(names_from = country_code, values_from = estimate) %>%
+  reframe(get_t_stat(UA %>% unlist(), RU %>% unlist()))
+
 ################################################################################
 # ACOUSTIC
 ################################################################################
@@ -267,3 +273,9 @@ kde_acoustic_boot_agg <- bind_acoustic_kde_boot %>%
 
 # report the statistics
 kde_acoustic_boot_agg
+
+# get group level difference
+bind_acoustic_kde_boot %>%
+  select(country_code, estimate) %>%
+  pivot_wider(names_from = country_code, values_from = estimate) %>%
+  reframe(get_t_stat(UA %>% unlist(), RU %>% unlist()))

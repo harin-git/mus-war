@@ -86,7 +86,6 @@ plot_city_level <- function(country){
            
            sub_cities <- ru_census[ru_census$city_type == 'Minority', 'city_name']
            colour_pal <- c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2)
-             
          })
   
   # report the minimum and maximum
@@ -101,6 +100,7 @@ plot_city_level <- function(country){
     complete(city_name, date, fill = list('boot_m' = 0)) %>%
     mutate(city_type = ifelse(city_name %in% sub_cities, city_categories[1], city_categories[2]))
   
+  
   # plot
   plot_cities %>%
     ggplot(aes(as.Date(date), boot_m, colour = city_type, group = city_name)) +
@@ -109,6 +109,24 @@ plot_city_level <- function(country){
     geom_vline(xintercept = WAR_START, linetype = 'dashed') +
     labs(x = '', y = 'Local music (%)') +
     scale_colour_manual(values = colour_pal) + 
+    scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+    # make sure it doesn't go below 0
+    ylim(0, 60) +
+    theme_classic() +
+    theme(legend.position = 'None')
+  
+  ggplot() +
+    geom_smooth(data = plot_cities %>% filter(city_type == 'Not occupied'),
+                aes(as.Date(date), boot_m, colour = city_type, group = city_name),
+                # linetype = ifelse(city_name == 'Mariupol', 'solid', 'dashed'),
+                se = FALSE, span = 1, size = 0.5) +
+    geom_smooth(data = subset(plot_cities, city_type == "Occupied"),
+                aes(as.Date(date), boot_m, colour = city_type, group = city_name,
+                    linetype = ifelse(city_name == 'Mariupol', 'solid', 'dashed')),
+                se = FALSE, span = 1, size = 0.5) +
+    geom_vline(xintercept = WAR_START, linetype = 'dashed') +
+    labs(x = '', y = 'Local music (%)') +
+    scale_colour_manual(values = colour_pal) +
     scale_x_date(date_labels = "%b", date_breaks = "1 month") +
     # make sure it doesn't go below 0
     ylim(0, 60) +

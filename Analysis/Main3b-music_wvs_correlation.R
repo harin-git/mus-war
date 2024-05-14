@@ -4,11 +4,12 @@
 # load study-wide functions and global variables
 source('utils.R')
 require(sf) # for spatial mapping
+require(psych) # for correlation test
 
 ################################################################################
 # PREPARATION
 ################################################################################
-COUNTRY_CODE <- 'UA'
+COUNTRY_CODE <- 'RU'
 GLOBAL <- TRUE # when true, use the global PC results, otherwise do separetely for UA and RU
 
 city_meta <- read_rds('Dataset/meta/city_metadata.rds')
@@ -107,14 +108,6 @@ for (i in 1:3) {
     ggplot(aes(pre_post_change * 100, !!sym(PC))) +
     geom_smooth(method = 'glm', colour = 'gray50') +
     geom_point(aes(colour = city_type), size = 1, alpha = 0.5) +
-    # if Russia invert the x axis
-    {
-      if(COUNTRY_CODE == 'RU') {
-        scale_x_reverse()
-      } else {
-        identity()
-      }
-    } +
     scale_colour_manual(values = COLOR_GRADIENT, guide = F)
   
   # save plot for main and SI figures
