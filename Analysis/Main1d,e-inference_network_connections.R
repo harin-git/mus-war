@@ -316,13 +316,15 @@ soviet_europe_long %>%
 plot_save('SI/outgoing_incoming_connections_w_europe', c(70, 100))
 
 # report stats at the country level mean
-soviet_europe_connection %>%
+stast_country_soviet_europe <- soviet_europe_connection %>%
   group_by(country_code, boot) %>%
   summarise(total = mean(total)) %>%
   group_by(country_code) %>%
   reframe(
     get_boot_mean_ci(total, 'total')
   )
+
+stast_country_soviet_europe
 
 # find which are the top outliers and label in figure
 soviet_europe_agg %>%

@@ -117,6 +117,7 @@ gam_boot_agg <- gam_boot %>%
   filter(worldbank_region != "Global") %>%
   left_join(WORLDBANK_REGION_COLOUR) # join for colour palette
 
+
 ################################################################################
 # TRENDS
 ################################################################################
