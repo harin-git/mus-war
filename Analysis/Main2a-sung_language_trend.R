@@ -27,7 +27,7 @@ study_data %>%
 study_data %>%
   distinct(country_code, trackID, lyrics_lang, lyrics_lang_prob) %>%
   group_by(country_code) %>%
-  reframe(nas = sum(is.na(lyrics_lang))/n())
+  reframe(nas = sum(is.na(lyrics_lang))/n()*100)
   
 
 ################################################################################

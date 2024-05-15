@@ -231,44 +231,6 @@ joined_agg %>%
   filter(region == 'Global') %>%
   select(type, pearson_m, pearson_lower_ci, pearson_upper_ci, order)
 
-# plot the correlation bar
-region_cor <- joined_agg %>%
-  filter(type != 'country') %>%
-  ggplot(
-    aes(
-      reorder(region,-order),
-      pearson_m,
-      ymin = pearson_lower_ci,
-      ymax = pearson_upper_ci,
-      colour = ifelse(region == 'Global', 'red', 'black')
-    )
-  ) +
-  geom_pointrange() +
-  labs(title = 'Within-region', y = 'Pearson correlation', x = '') +
-  coord_flip() +
-  theme(legend.position = 'none')
-
-country_cor <- joined_agg %>%
-  filter(type != 'region') %>%
-  ggplot(
-    aes(
-      reorder(region,-order),
-      pearson_m,
-      ymin = pearson_lower_ci,
-      ymax = pearson_upper_ci,
-      colour = ifelse(region == 'Global', 'red', 'black')
-    )
-  ) +
-  geom_pointrange() +
-  labs(title = 'Within-country', y = 'Pearson correlation', x = '') +
-  coord_flip() +
-  theme(legend.position = 'none')
-
-region_cor
-
-# save the plot for SI 
-plot_save('SI/network_within_region_correlation', c(100, 100))
-
 
 ################################################################################
 # CORRELATION MATRIX
@@ -328,7 +290,7 @@ get_matrix_pre_post <- function(pre_post, type = c('postsoviet', 'within-region'
                           ),
       legend.position = 'bottom'
     ) +
-    scale_fill_viridis(limits = fill_scale) +
+    scale_fill_viridis(limits = fill_scale, guide = FALSE) +
     labs(title = sprintf('%s %s', pre_post, type), fill = "Log weight")
   
   switch(type,
