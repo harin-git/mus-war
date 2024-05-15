@@ -171,13 +171,6 @@ mario
 
 
 ## RUSSIAN STATS
-# general homogeneity of change in Russia
-city_boot_output %>%
-  filter(country_code == 'RU') %>%
-  group_by(pre_post, boot) %>%
-  summarise(sd = sd(prop)) %>%
-  reframe(get_boot_mean_ci(sd, 'sd'))
-
 # change by russian cities
 ru_cities <- city_boot_output %>%
   ungroup() %>%
@@ -199,23 +192,26 @@ ru_agg <- ru_cities %>%
 
 # pre post diff
 ru_agg <- ru_agg %>%
-  mutate(pre_post_diff = post - pre)
+  mutate(pre_post_diff = post - pre) %>%
+  arrange(pre_post_diff)
 
+# minority vs. non-minority regions
 ru_agg %>%
   select(pre_post_diff, city_type) %>%
   pivot_wider(names_from = city_type, values_from = pre_post_diff) %>%
   summarise(get_t_stat(min %>% unlist(), notmin %>% unlist()))
 
-# mean decrease in russia
-russia_change_mean <- city_boot_output %>%
-  filter(country_code == 'RU') %>%
-  group_by(city_name, boot, pre_post) %>%
+# Compute which city had the steepest decline
+ru_cities_decline <- ru_cities %>%
+  group_by(city_name, pre_post, boot) %>%
   summarise(m = mean(prop)) %>%
-  select(pre_post, boot, m) %>%
+  ungroup() %>%
   pivot_wider(names_from = pre_post, values_from = m) %>%
-  group_by(boot) %>%
-  summarise(get_t_stat(post %>% unlist(), pre %>% unlist()))
+  mutate(pre_post_diff = post - pre)
 
-russia_change_mean %>%
-  reframe(get_boot_mean_ci(cohensD, 'd'))
+ru_cities_decline <- ru_cities_decline %>%
+  group_by(city_name) %>%
+  reframe(get_boot_mean_ci(pre_post_diff, 'diff')) %>%
+  arrange(diff_m)
 
+ru_cities_decline

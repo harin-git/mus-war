@@ -3,7 +3,7 @@
 
 # load study-wide functions and global variables
 source('utils.R')
-library(stringdist) # for fuzzy string matching
+require(stringdist) # for fuzzy string matching
 
 # get data for 2021 of spotify and shazam
 # The data for these two are not included in OSF as it is excessively large. 

@@ -6,7 +6,6 @@ source('utils.R')
 require(forcats) # easier factor handling
 require(lintr) # code linting
 require(sf) # spatial data handling
-require(rnaturalearth) # country borders geometries from naturalearth.org
 
 
 ################################################################################
@@ -244,13 +243,7 @@ ggplot() +
   labs(title = ifelse(type == 'wvs', pc, ''), fill = '') +
   geom_point(data = point_data, aes(x = lon, y = lat, shape = city_category), 
              colour = ifelse(country == 'UA', 'black', 'white'), alpha = 1, size = 1.5) +
-  switch(type,
-         music = {
-           scale_fill_gradient(low = colour_gradient[1], high = colour_gradient[2])
-         },
-         wvs = {
-           scale_fill_gradient(low = colour_gradient[1], high = colour_gradient[2])
-         }) +
+  scale_fill_gradient(low = colour_gradient[1], high = colour_gradient[2]) +
   scale_shape_manual(values = c('cross', 'square'), guide = F) +
   theme_map()
 

@@ -6,7 +6,7 @@
 # load study-wide functions and global variables
 source('utils.R')
 require(uwot) # for UMAP
- 
+require(philentropy) # for JSD computation
 
 ################################################################################
 # PREPARATION
@@ -135,11 +135,8 @@ lyrics_feat <- lyrics_embedding %>% select(-trackID, -pre_post, -lyrics_language
 lyrics_meta <- lyrics_embedding %>% select(trackID, pre_post, lyrics_language, country_code)
 lyrics_meta$lyrics_language_category <- ifelse(lyrics_meta$lyrics_language %in% c('uk', 'ru'), lyrics_meta$lyrics_language, 'Other')
 
-# set seed for reproducibility
-set.seed(42)
-
 # compute umap
-umap_lyrics <- lyrics_feat %>% umap(n_neighbors = 5, n_components = 2, min_dist = 0.1, metric = 'cosine')
+umap_lyrics <- lyrics_feat %>% umap(n_neighbors = 10, n_components = 2, min_dist = 0.1, metric = 'cosine')
 umap_lyrics <- cbind.data.frame(setNames(as.data.frame(umap_lyrics), c("x", "y")), lyrics_meta)
 umap_lyrics$pre_post <- factor(umap_lyrics$pre_post, levels = c('pre', 'post'))
 
@@ -220,11 +217,8 @@ acoustic_feat <- acoustic_embedding %>% select(-trackID, -pre_post, -lyrics_lang
 acoustic_meta <- acoustic_embedding %>% select(trackID, pre_post, lyrics_language)
 acoustic_meta$lyrics_language_category <- ifelse(acoustic_meta$lyrics_language %in% c('uk', 'ru'), acoustic_meta$lyrics_language, 'Other')
 
-# set seed for reproducibility
-set.seed(42)
-
 # compute umap
-umap_acoustic <- acoustic_feat %>% umap(n_neighbors = 5, n_components = 2, min_dist = 0.1, metric = 'cosine')
+umap_acoustic <- acoustic_feat %>% umap(n_neighbors = 10, n_components = 2, min_dist = 0.1, metric = 'cosine')
 umap_acoustic <- cbind.data.frame(setNames(as.data.frame(umap_acoustic), c("x", "y")), acoustic_meta)
 umap_acoustic$pre_post <- factor(umap_acoustic$pre_post, levels = c('pre', 'post'))
 
@@ -246,10 +240,10 @@ ru_acoustic_kde <- rbind(ru_pre_acoustic, ru_post_acoustic) %>%
   mutate(pre_post = factor(pre_post, levels = c('pre', 'post')))
 
 # plot the two umaps with KDE
-plot_umap_density(umap_acoustic, ua_acoustic_kde, 'UA', labels = TRUE)
+plot_umap_density(umap_acoustic, ua_acoustic_kde, 'UA')
 plot_save('SI/umap_ukrainian_acoustic', c(150, 80))
 
-plot_umap_density(umap_acoustic, ru_acoustic_kde, 'RU', labels = TRUE)
+plot_umap_density(umap_acoustic, ru_acoustic_kde, 'RU')
 plot_save('SI/umap_russian_acoustic', c(150, 80))
 
 

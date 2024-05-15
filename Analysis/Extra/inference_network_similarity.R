@@ -19,8 +19,8 @@ post_edge_untrimmed <- read.csv('Dataset/network/netinf/post_E10000_B1000_agg.cs
 ################################################################################
 # PREPARATION
 ################################################################################
-# load edge tables for each bootstrap
-boot_dir <- 'netinf/bootstrap_samples/'
+# load edge tables for each bootstrap. This requires you to first run "infer_diffusion_network.R" script
+boot_dir <- 'XXX' # directory where each NETINF output is stored
 
 # make a dummy edge list
 dim <- city_meta$ID %>% n_distinct()

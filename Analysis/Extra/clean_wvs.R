@@ -5,7 +5,7 @@
 source('utils.R')
 
 # load wvs data
-load("~/WVS7/WVS_Cross-National_Wave_7_rData_v5_0.rdata")
+load("XXX") # path where you downloaded the WVS r data.
 wvs <- `WVS_Cross-National_Wave_7_v5_0`
 
 # get all questions for each city in the wvs

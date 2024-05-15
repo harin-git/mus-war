@@ -3,6 +3,7 @@
 
 # load study-wide functions and global variables
 source('utils.R')
+require(psych) # for correlation test
 
 # load bootstrapped trend data
 local_trend_boot <- read_rds('Bootstraps/trend_lyrics_lang_boot1000.rds')
@@ -20,15 +21,16 @@ ua_long <- local_trend_boot %>%
   # after the study window
   filter(date > WAR_START + 90) %>%
   group_by(name, boot) %>%
-  reframe(min = min(prop), 
-          max = max(prop),
+  reframe(min = min(prop * 100), 
+          max = max(prop * 100),
           )
 
-# report the min and max in the main text
+# report the min and max for Ukraine trend
 ua_long <- ua_long %>%
   group_by(name) %>%
   summarise(get_boot_mean_ci(min, 'min'),
             get_boot_mean_ci(max, 'max'))
+ua_long
 
 # Get the first day of returning to pre-invasion level mean for Russian lyrics
 pre_mean <- local_trend_boot %>%
@@ -123,23 +125,21 @@ ua_season_cor <- ua_seasons %>%
   select(window, name, date, boot_m) %>%
   pivot_wider(names_from = c(name, window), values_from = boot_m)
 
-cor.test(ua_season_cor$uk_2022, ua_season_cor$uk_2023, use = 'complete.obs')
-cor.test(ua_season_cor$ru_2022, ua_season_cor$ru_2023, use = 'complete.obs')
+corr.test(ua_season_cor, use = 'complete.obs', adjust = 'bonferroni')
 
 # russian cor test in other countries
 other_seasons_cor <- other_seasons %>%
   select(window, country_code, date, boot_m) %>%
   pivot_wider(names_from = c(country_code, window), values_from = boot_m)
 
-cor.test(other_seasons_cor$RU_2022, other_seasons_cor$RU_2023, use = 'complete.obs')
-cor.test(other_seasons_cor$BY_2022, other_seasons_cor$BY_2023, use = 'complete.obs')
-cor.test(other_seasons_cor$KZ_2022, other_seasons_cor$KZ_2023, use = 'complete.obs')
+corr.test(other_seasons_cor, use = 'complete.obs', adjust = 'bonferroni')
 
 ################################################################################
 # RANDOM FLUCTUATIONS
 ################################################################################
 # Test for random fluctuations by sampling 6 months randomly and comparing pre and post
 # compare this to the observed difference during invasion period using cohen's d
+lyrics_long <- read_rds('Dataset/chart/longitudinal_postsoviet_chart.rds')
 post_invasion_period <- lyrics_long %>%
   filter(date > WAR_START + 90) %>%
   select(date, country_code, language = name, m = mean_boot_value) %>%

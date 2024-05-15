@@ -32,7 +32,7 @@ get_coco <- function(pre_post = c('pre', 'post', 'global')){
   
   # define the weights of each song by the number of times a song has been played everywhere
   song_popularity <- ft_data %>%
-    group_by(track_id) %>%
+    group_by(trackID) %>%
     summarise(n_country = n_distinct(country_code)) %>%
     mutate(song_weight = 1 / (n_country - 1)) %>%
     mutate(song_weight = ifelse(is.infinite(song_weight), 0, song_weight))
@@ -46,11 +46,11 @@ get_coco <- function(pre_post = c('pre', 'post', 'global')){
     source_city <- ft_data %>% filter(nodeID == all_cities[i])
 
     # get overlaps
-    source_songs <- source_city$track_id
+    source_songs <- source_city$trackID
     
     overlaps <- ft_data %>%
       group_by(nodeID) %>%
-      summarise(weight = length(intersect(source_city$track_id, track_id)) / (length(source_city$track_id) + length(track_id)) * 2) %>%
+      summarise(weight = length(intersect(source_city$trackID, trackID)) / (length(source_city$trackID) + length(trackID)) * 2) %>%
       ungroup() %>%
       rename(Target = nodeID)
     

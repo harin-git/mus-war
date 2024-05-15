@@ -3,8 +3,8 @@
 
 # load study-wide functions and global variables
 source('utils.R')
-library(sf) # spatial data handling
-library(rnaturalearth) # for world map
+require(sf) # spatial data handling
+require(rnaturalearth) # for world map
 
 ################################################################################
 # PREPARATION
@@ -57,9 +57,9 @@ CRS <-  "+proj=longlat +datum=WGS84"
 
 if(COUNTRY_CODE == "UA"){
   # Get Ukraine's administrative regions
-  ukraine_regions <- ne_states(country = "Ukraine", returnclass = "sf") %>% select(iso_3166_2, name, geometry)
-  russian_regions <- ne_states(country = 'Russia', returnclass = "sf") %>% select(iso_3166_2, name, name_ru, geometry)
-  
+  ukraine_regions <- read_rds('Dataset/census/ukraine_regions_map.rds')
+  russian_regions <- read_rds('Dataset/census/russian_regions_map.rds')
+
   # update ukraine regions including crimea
   region <- ukraine_regions %>% bind_rows(russian_regions %>% filter(iso_3166_2 %in% c('UA-43', 'UA-40')))
 } else {
@@ -190,7 +190,7 @@ if(COUNTRY_CODE == 'RU'){
   census_ru_mapped <- read.csv('Dataset/census/russia_census_city_mapped.csv')
   
   # For russia, add statistics about two minority population regions as examples
-  minority_groups <- c('RU-DA', 'RU-TA') # Makhachkala and Ufa
+  minority_groups <- c('RU-DA', 'RU-TA', 'RU-BA') # Makhachkala and Ufa
   
   minority_data <- filter(CENSUS_RAW, iso_3166_2 %in% minority_groups)
   minority_data <- minority_data %>%

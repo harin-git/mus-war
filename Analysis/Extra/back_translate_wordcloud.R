@@ -2,6 +2,7 @@
 #' Related to Supplementary Information in paper
 
 source('utils.R')
+require(ggwordcloud)
 
 # make wordcloud of the words
 make_wordcloud <- function(zero_rank_df, 
@@ -30,10 +31,10 @@ make_wordcloud <- function(zero_rank_df,
 }
 
 # load original wordcloud words
-ua_zeta <- read.csv2('Dataset/lyrics/UA_zeta_rank_original_backtranslate.csv')
+ua_zeta <- read.csv('Dataset/lyrics/UA_zeta_rank_original_backtranslate.csv')
 ua_zeta$plotsize <- as.numeric(ua_zeta$plotsize)
 
-ru_zeta <- read.csv2('Dataset/lyrics/RU_zeta_rank_original_backtranslate.csv')
+ru_zeta <- read.csv('Dataset/lyrics/RU_zeta_rank_original_backtranslate.csv')
 ru_zeta <- ru_zeta[-c(7,8,9), ]
 ru_zeta$plotsize <- as.numeric(ru_zeta$plotsize)
 

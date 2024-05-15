@@ -321,11 +321,11 @@ make_dummy_dictionary <- function(df, save_path){
 # for creating song cascade file to insert into NETINF
 get_song_cascade <- function(df, save_path){
   arrange_by_date <- df %>%
-    group_by(track_id, nodeID) %>%
+    group_by(trackID, nodeID) %>%
     filter(date == min(date)) %>% # consider only first appearance
-    group_by(track_id) %>%
+    group_by(trackID) %>%
     mutate(day_since = as.numeric(as.Date(date) - min(as.Date(date))) + 1) %>% # calculate day since it first appeared
-    arrange(track_id, nodeID) %>%
+    arrange(trackID, nodeID) %>%
     mutate(node_day = paste(nodeID, day_since, sep = ',')) %>% # make into nodeID, day format
     summarise(cascade = paste(node_day, collapse = ','))
   
@@ -476,7 +476,10 @@ get_edges_within_regions = function(all_regions, pre_network, post_network){
 # for saving plots. Defaults to making both PNG and PDF versions.
 plot_save <- function(plot_name, size = c(183, 100), pdf = TRUE){ 
   # if no dir called Plots, make one
-  if(!dir.exists('Plots')){dir.create('Plots')}
+  if(!dir.exists('Plots')){
+    dir.create('Plots/Main', recursive = TRUE)
+    dir.create('Plots/SI', recursive = TRUE)
+    }
   
   # default size for journal is 183mm wide
   message(sprintf('saving plot to: %s', plot_name))
