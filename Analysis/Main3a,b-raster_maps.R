@@ -13,7 +13,7 @@ require(sf) # spatial data handling
 ################################################################################
 type <- 'wvs'        # 'music' for local music proportion change and 'wvs' for socio-cultural values PCA loadings
 pc <- 'PC1'          # which PC to use for the plotting. Only relevant when type = 'wvs'
-resolution <- 50     # 100 is minimal, 500 and higher is very fine-grained resolution but takes a long time
+resolution <- 200    # 100 is minimal, 500 and higher is very fine-grained resolution but takes a long time
 country <- 'UA'      # UA or RU
 nquantile <- 4       # number of quantile to split to reduce noise
 global <- TRUE       # if TRUE load global WVS data, if FALSE, use separate PCA results per country

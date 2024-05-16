@@ -117,7 +117,7 @@ acoustic_diff %>%
   geom_hline(yintercept = 0) +
   scale_colour_manual(values = c(UKRAINE_COLOUR, RUSSIAN_COLOUR)) +
   coord_flip() +
-  labs(x = '', y = 'Pre vs. post difference (Z-score)') +
+  labs(x = '', y = 'Pre vs. Post difference (z-score)') +
   scale_y_continuous(breaks = c(-0.5, 0, 0.5)) +
   theme(legend.position = 'none')
 

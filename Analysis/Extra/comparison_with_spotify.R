@@ -8,8 +8,8 @@ require(stringdist) # for fuzzy string matching
 # get data for 2021 of spotify and shazam
 # The data for these two are not included in OSF as it is excessively large. 
 # Please contact the author for the data.
-spotify_chart <- read_rds('Dataset/data_comparison/2021_spotify_chart.rds')
-shazam_chart <- read_rds('Dataset/data_comparison/2021_shazam_chart.rds')
+spotify_chart <- read.csv('Dataset/data_comparison/2021_spotify_chart.csv')
+shazam_chart <- read.csv('Dataset/data_comparison/2021_shazam_chart.csv')
 
 # code the date into months for comparison in each month
 spotify_chart <- spotify_chart %>%
