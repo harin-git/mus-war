@@ -1,4 +1,4 @@
-This repo contains code for the paper "**Global music discoveries reveal cultural shifts during the war in Ukraine**". To reproduce our analyses you will need some or all of these files.
+This repo contains code for the paper "**Rapid reshaping of cultural boundaries during the war in Ukraine**". To reproduce our analyses you will need some or all of these files.
 
 > All data and materials are publicly archived at [OSF](https://osf.io/ra38k), with the exception of song lyrics data which belongs to the relevant right holders. All analysis scripts are available and maintained at <https://github.com/harin-git/mus-war>.
 
