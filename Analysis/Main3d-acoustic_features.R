@@ -1,5 +1,5 @@
 #' Acoustic analyses on genre and music features 
-#' Related to Fig. 2 in the paper
+#' Related to Fig. 3 in paper
 
 # load study-wide functions and global variables
 source('utils.R')

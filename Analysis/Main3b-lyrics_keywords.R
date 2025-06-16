@@ -1,19 +1,19 @@
 #' Finding keywords in lyrics of Ukraine and Russia.
 #' Code is adopted from: https://burtmonroe.github.io/TextAsDataCourse/Tutorials/TADA-FightinWords.nb.html
-#' Related to Fig.2 in paper
+#' Related to Fig.3 in paper
 
 # load study-wide functions and global variables
 source('utils.R')
-require(quanteda) # for text analysis
+library(quanteda) # for text analysis
 
 
 ################################################################################
 # SETUP
 ################################################################################
 # Lyrics data cannot be shared due to copyright issues, thus the script is for reference of the working only.
-lyrics_data <- read_rds('XXX')
-country <- 'UA' # either 'UA' (Ukraine) or 'RU' (Russia)
-translated <- FALSE # if FALSE, the wordcloud is made using original lyrics_data (not translated)
+lyrics_data <- read_rds('Dataset/lyrics/UA_RU_lyrics_acoustics_gpt.rds')
+country <- 'RU' # either 'UA' (Ukraine) or 'RU' (Russia)
+translated <- TRUE # if FALSE, the wordcloud is made using original lyrics_data (not translated)
 
 # custom stop words to remove in the wordclouds
 custom_stopwords <- c('ba', 'da', 'eh-', 'di', 
@@ -138,7 +138,7 @@ switch (country,
 # filter the country
 sel_country <- lyrics_data %>% 
   filter(country_code == country, 
-         !is.na(cleaned_lyrics),
+         !is.na(cleaned_lyrics_gpt),
          lyrics_language == lang) %>%
   mutate(pre_post = as.factor(pre_post))
 
@@ -147,7 +147,7 @@ sel_country_meta <- sel_country$pre_post
 
 # convert the text column into a character vector
 if(translated){
-  text_vector <- as.character(sel_country$cleaned_lyrics)
+  text_vector <- as.character(sel_country$cleaned_lyrics_gpt)
 } else {
   text_vector <- as.character(sel_country$lyrics)
 }

@@ -1,7 +1,7 @@
 #' Proportion of war-related songs in Ukraine and Russia
 #' Word embedding vectors extracted from tokenised words of lyrics (see 'Analysis/Extra/extracting_word_embedding.R' script)
 #' is used to find the closest neighbour to the seed word "war".
-#' Related to Fig. 2 in the paper
+#' Related to Fig. 3 in the paper
 
 # load study-wide functions and global variables
 source('utils.R')
@@ -11,15 +11,15 @@ library(quanteda) # for text processing
 ################################################################################
 # SETUP
 ################################################################################
-SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
+SIMULATION <- TRUE # if FALSE, pre-computed bootstrap is loaded
 
 # if TRUE, test the graph of war related songs for different thresholds of n closest words
 # otherwise use 5 as in the main study
-control <- FALSE
+control <- TRUE
 
 # n closest words to war words in the embedding
 if(control){
-  nclosest <- c(1, 3, 10)
+  nclosest <- c(1, 3, 7)
 } else {
   nclosest <- 5
 }
@@ -27,8 +27,8 @@ if(control){
 # load data
 chart_data <- read_rds('Dataset/chart/study_set_chart.rds')
 # Lyrics data cannot be shared due to copyright issues. However, loading bootstrap results can reproduce the figures.
-lyrics <- read_rds('XXX') 
-word_embedding <- read_rds('Dataset/lyrics/UA_RU_word_embedding.rds')
+lyrics <- read_rds('Dataset/lyrics/UA_RU_lyrics_acoustics_gpt.rds') %>% rename(trackID = track_id)
+word_embedding <- read_rds('Dataset/lyrics/UA_RU_word_embedding_gpt.rds') 
 
 # define war related words
 war_words <- c('war')
@@ -68,10 +68,10 @@ if(SIMULATION){
 # LYRICS TOKENISATION
 ################################################################################
 if(SIMULATION){
-  filtered_lyrics <- lyrics %>% filter(!is.na(cleaned_lyrics), country_code %in% c('RU', 'UA'))
+  filtered_lyrics <- lyrics %>% filter(!is.na(cleaned_lyrics_gpt), country_code %in% c('RU', 'UA'))
   
   # make a cleaned token table of all lyrics
-  tokens <- tokens(filtered_lyrics$cleaned_lyrics, remove_numbers = TRUE, remove_punct = TRUE, remove_symbols = TRUE)
+  tokens <- tokens(filtered_lyrics$cleaned_lyrics_gpt, remove_numbers = TRUE, remove_punct = TRUE, remove_symbols = TRUE)
   tokens <- tokens_remove(tokens, pattern = stopwords("en"), padding = FALSE)
   tokens_stemmed <- tokens_wordstem(tokens, language = "english")
 }
@@ -157,7 +157,7 @@ war_traj_cor <- war_traj %>%
   select(country_code, date, boot_m) %>%
   pivot_wider(names_from = country_code, values_from = boot_m)
 
-cor_result <- corr.test(war_traj_cor %>% mutate(date = as.numeric(date)), adjust = 'bonferroni', method = 'pearson')
+cor_result <- psych::corr.test(war_traj_cor %>% mutate(date = as.numeric(date)), adjust = 'bonferroni', method = 'pearson')
 print(cor_result, short=FALSE) 
 print(cor_result$stars, quote=FALSE, short=FALSE)
 

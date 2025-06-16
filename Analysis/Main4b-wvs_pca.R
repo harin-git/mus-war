@@ -1,5 +1,5 @@
 #' PCA analysis of the WVS data
-#' Related to Fig.3 in paper
+#' Related to Fig.4 in paper
 
 # load study-wide functions and global variables
 source('utils.R')

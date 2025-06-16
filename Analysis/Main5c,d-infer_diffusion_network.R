@@ -1,7 +1,7 @@
 #' The NETINF algorithm is used to infer the global diffusion network using song cascades. 
 #' It needs to be downloaded to run the code below.
 #' Visit the SNAP website for download of the software: http://snap.stanford.edu/netinf/
-#' Related to Fig.1 in paper
+#' Related to Fig.5 in paper
 
 # load study-wide functions and global variables
 source('utils.R')

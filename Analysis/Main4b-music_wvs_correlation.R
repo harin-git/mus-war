@@ -1,5 +1,5 @@
 #' Correlations between local music proportion and socio-cultural values
-#' Related to Fig. 3 in paper
+#' Related to Fig. 4 in paper
 
 # load study-wide functions and global variables
 source('utils.R')

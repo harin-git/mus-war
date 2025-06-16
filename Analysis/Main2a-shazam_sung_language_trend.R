@@ -28,7 +28,14 @@ study_data %>%
   distinct(country_code, trackID, lyrics_lang, lyrics_lang_prob) %>%
   group_by(country_code) %>%
   reframe(nas = sum(is.na(lyrics_lang))/n()*100)
-  
+
+# how many songs were excluded for the sub languages by confidence threshold?
+study_data %>%
+  distinct(trackID, lyrics_lang, lyrics_lang_prob) %>%
+  filter(lyrics_lang %in% sub_languages) %>%
+  mutate(over_threshold = ifelse(lyrics_lang_prob >= 0.7, TRUE, FALSE)) %>%
+  group_by(lyrics_lang) %>%
+  summarise(exclusion = 1 - (sum(over_threshold)/n()))
 
 ################################################################################
 # LONGITUDINAL TRENDS: LYRICS LANGUAGE

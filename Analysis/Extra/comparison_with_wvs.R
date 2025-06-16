@@ -1,5 +1,5 @@
 #' Compare how the socio-cultural values align with music listening, globally
-#' Related to Discussion in paper
+#' Related to Methods in paper
 
 # load study-wide functions and global variables
 source('utils.R')

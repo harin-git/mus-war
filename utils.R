@@ -237,9 +237,7 @@ get_proportion <- function(x) {
 }
 
 # for margin of error
-CI <- function(x, alpha = 0.05){
-  mean_value <- mean(x)
-  
+CI <- function(x, alpha = 0.05){    
   # Compute the size
   n <- length(x)
   
@@ -290,6 +288,13 @@ calculate_cosine_similarity <- function(vec1, vec2) {
   sum(vec1 * vec2) / (sqrt(sum(vec1^2)) * sqrt(sum(vec2^2)))
 }
 
+# jaccard similarity between two vectors
+jaccard_similarity <- function(vec1, vec2) {
+    intersection = length(intersect(vec1, vec2))
+    union = length(vec1) + length(vec2) - intersection
+    return (intersection/union)
+}
+
 # for finding closest points between two locations
 find_closest_point <- function(lon, lat, dataset) {
   d <- geosphere::distVincentySphere(c(lon, lat), cbind(dataset$lon, dataset$lat))
@@ -298,6 +303,7 @@ find_closest_point <- function(lon, lat, dataset) {
   nodeID <- dataset[closest_index, ]$nodeID
   return(tibble(nodeID, city_name, distance = min(d)))
 }
+
 
 
 ################################################################################

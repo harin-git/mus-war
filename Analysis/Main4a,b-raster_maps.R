@@ -1,5 +1,5 @@
 #' Produce geographical map of local music proportion and socio-cultural values in Ukraine and Russia.
-#' Related to Fig.3 in paper
+#' Related to Fig.4 in paper
 
 # load packages and methods
 source('utils.R')

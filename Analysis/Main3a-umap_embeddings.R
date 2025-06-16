@@ -1,7 +1,7 @@
 #' Perform dimensionality reduction using UMAP and compare the distribution density pre vs. post-invasion 
 #' Lyrical features vectors are extracted from LLM (see Analysis/Extra/extraction_word_embedding.R script)
 #' Acoustic features are extracted using Essentia (https://essentia.upf.edu)
-#' Related to Fig.2 in paper
+#' Related to Fig.3 in paper
 
 # load study-wide functions and global variables
 source('utils.R')
@@ -14,8 +14,8 @@ require(philentropy) # for JSD computation
 SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 # load the dataset
-song_meta <- read_rds('Dataset/meta/song_metadata.rds')
-lyrics_embedding <- read_rds('Dataset/lyrics/UA_RU_lyrics_embedding.rds')
+song_meta <- read_rds('Dataset/meta/song_metadata.rds') 
+lyrics_embedding <- read_rds('Dataset/lyrics/UA_RU_lyrics_embedding_gpt.rds') %>% rename(trackID = track_id)
 
 # computes the KDE estimation in 2D space
 get_kde <- function(df, lyrics_lang = c('uk', 'ru'), type = c('pre', 'post'), h = 1, nbin = 512){

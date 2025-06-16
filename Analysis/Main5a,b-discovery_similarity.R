@@ -1,5 +1,5 @@
 #' Discovery similarity among countries within each world regions
-#' Related to Fig.1 in paper
+#' Related to Fig.5 in paper
 
 # load study-wide functions and global variables
 source('utils.R')
@@ -177,7 +177,7 @@ decline_coef <- boot_normalized %>%
 # fit gams
 decline_gam <- decline_coef %>%
   group_by(window, boot) %>%
-  do(coef = gam::gam(norm_sim ~ as.Date(date), data = .) %>% coef() %>% .[2] %>% as.numeric())
+  do(coef = gam::gam(region_similarity ~ as.Date(date), data = .) %>% coef() %>% .[2] %>% as.numeric())
 
 # report stats
 decline_gam %>%
@@ -195,7 +195,7 @@ region_effect <- region_sim_norm %>%
 
 # do t-test using the pre and post values for each boot strapped samples
 region_change_effect <- region_effect %>%
-  pivot_wider(names_from = pre_post, values_from = norm_sim) %>%
+  pivot_wider(names_from = pre_post, values_from = region_similarity) %>%
   group_by(boot, worldbank_region) %>%
   summarise(get_t_stat(post %>% unlist(), pre %>% unlist())) %>%
   ungroup()

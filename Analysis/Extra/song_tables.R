@@ -1,4 +1,5 @@
-#' Create Supplementary Information Tables 2-4
+#' Top songs in Ukraine and Poland
+#' Related to Supplementary Information in paper
 
 # load study-wide functions and global variables
 source('utils.R')

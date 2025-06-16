@@ -1,5 +1,5 @@
 #' Calculate changes in network connections and density
-#' Related to Fig.1 in paper
+#' Related to Fig.5 in paper
 
 # load study-wide functions and global variables
 source('utils.R')
@@ -290,7 +290,7 @@ soviet_europe_agg$country_code <- factor(soviet_europe_agg$country_code, levels 
 soviet_europe_long <- soviet_europe_agg %>%
   select(country_code, city, outgoing_m, incoming_m) %>%
   pivot_longer(c(outgoing_m, incoming_m))
-soviet_europe_long$name <- factor(soviet_europe_long$name, levels = c('outgoing_m', 'incoming_m'), labels = c('Outgoing edges to Europe', 'Incoming edges from Europe'))
+soviet_europe_long$name <- factor(soviet_europe_long$name, levels = c('incoming_m', 'outgoing_m'), labels = c('Incoming edges from Europe', 'Outgoing edges to Europe'))
 
 soviet_country_mean <- soviet_europe_long %>%
   group_by(country_code, name) %>%
@@ -310,10 +310,10 @@ soviet_europe_long %>%
   geom_vline(xintercept = 0, linetype = 'dashed') +
   scale_colour_manual(values = c(RUSSIAN_COLOUR, UKRAINE_COLOUR), guide = 'none') +
   theme_classic() +
-  facet_wrap(~ name, nrow = 2)
+  facet_wrap(~ name, nrow = 1)
 
 # save plot for SI
-plot_save('SI/outgoing_incoming_connections_w_europe', c(70, 100))
+plot_save('SI/outgoing_incoming_connections_w_europe', c(120, 80))
 
 # report stats at the country level mean
 stast_country_soviet_europe <- soviet_europe_connection %>%

@@ -74,9 +74,3 @@ make_wordcloud(ru_zeta, 'post', RUSSIAN_COLOUR, TRUE)
 plot_save('SI/RU_lyrics_post_wordcloud_backtranslate', c(100, 80))
 make_wordcloud(ru_zeta, 'post', RUSSIAN_COLOUR, FALSE)
 plot_save('SI/RU_lyrics_post_wordcloud_original', c(100, 80))
-
-
-
-
-
-

@@ -1,5 +1,5 @@
 #' Temporal trends in local proportion of songs per cities in Ukraine and Russia
-#' Related to Fig. 3 in paper
+#' Related to Fig. 4 in paper
 
 # load study-wide functions and global variables
 source('utils.R')

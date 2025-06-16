@@ -1,6 +1,6 @@
 #' Aligning the layouts of the pre- and post-invasion networks.
 #' The script outputs edge and node tables to be visualized using Gephi (https://gephi.org/)
-#' Related to Fig.1 in paper
+#' Related to Fig.5 in paper
 
 # load study-wide functions and global variables
 source('utils.R')
