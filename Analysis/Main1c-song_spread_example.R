@@ -69,11 +69,18 @@ make_spread_map <- function(dt) {
                 fill = "grey95", 
                 color = "grey50", 
                 linewidth = 0.3) +
+    # add density distribution as raster smooth map
+    stat_density_2d(data = dt, 
+                aes(x = lon, y = lat, fill = after_stat(density)), 
+                geom = "raster", 
+                contour = FALSE,
+                alpha = 0.5) +
+    scale_fill_gradient(low = "white", high = "#FFA500", guide = "none") +
     # Add Post-Soviet city points
     geom_point(data = dt, 
                 aes(x = lon, y = lat, color = worldbank_region),
                 size = 2, 
-                alpha = 0.8,
+                alpha = 1,
                 colour = 'black',
                 shape = 3) +
     theme_map() +
@@ -86,4 +93,7 @@ day_10_map <- make_spread_map(song_spread_10)
 day_30_map <- make_spread_map(song_spread_30)
 
 day_0_map + day_10_map + day_30_map
+
+# save the plot
 plot_save('Main/song_spread_example', c(500, 80))
+
