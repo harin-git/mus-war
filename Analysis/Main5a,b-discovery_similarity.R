@@ -79,6 +79,13 @@ region_sim_norm <- region_output %>%
   group_by(worldbank_region) %>%
   mutate(norm_sim = scale(region_similarity))
 
+# finite-difference derivative of a GAM smooth at a given day
+get_gam_derivative <- function(model, date_num, eps = 1) {
+  pred_forward <- predict(model, newdata = tibble(date_num = date_num + eps), type = 'response')
+  pred_backward <- predict(model, newdata = tibble(date_num = date_num - eps), type = 'response')
+  as.numeric((pred_forward - pred_backward) / (2 * eps))
+}
+
 # make a global reference
 global_ref <- region_sim_norm %>%
   group_by(boot, date) %>%
@@ -164,25 +171,33 @@ gam_boot_agg <- gam_boot %>%
 # save plot for main figure
 plot_save('Main/within_region_discovery_similarity_over_time', c(130, 80))
 
-# Report stats on the coefficients of pre and post invasion
-decline_coef <- boot_normalized %>%
-  filter(worldbank_region == 'Post-Soviet') %>%
-  mutate(window = case_when(
-    date < WAR_START ~ 'pre', # pre war
-    date > WAR_START & date < WAR_START + 30 ~ '1 month', # within one month after onset
-    TRUE ~ NA
-  )) %>%
-  na.omit()
+# Report derivatives of the GAM smooth at key timepoints
+derivative_dates <- tibble(
+  window = c('3 months prior', '1 month after'),
+  eval_date = c(WAR_START - 90, WAR_START + 30)
+)
 
-# fit gams
+decline_coef <- region_output %>%
+  filter(worldbank_region == 'Post-Soviet') %>%
+  mutate(
+    date = as.Date(date),
+    date_num = as.numeric(date)
+  )
+
+# fit GAMs on the raw similarity scale and evaluate the first derivative
 decline_gam <- decline_coef %>%
-  group_by(window, boot) %>%
-  do(coef = gam::gam(region_similarity ~ as.Date(date), data = .) %>% coef() %>% .[2] %>% as.numeric())
+  group_by(boot) %>%
+  group_modify(~ {
+    gam_model <- gam::gam(region_similarity ~ s(date_num, 2), data = .x)
+    derivative_dates %>%
+      mutate(derivative = purrr::map_dbl(as.numeric(eval_date), ~ get_gam_derivative(gam_model, .x)))
+  }) %>%
+  ungroup()
 
 # report stats
 decline_gam %>%
   group_by(window) %>%
-  reframe(get_boot_mean_ci(coef %>% unlist(), 'coef'))
+  reframe(get_boot_mean_ci(derivative, 'derivative'))
 
 
 ################################################################################
