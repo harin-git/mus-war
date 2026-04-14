@@ -70,7 +70,6 @@ if(SIMULATE){
   region_output <- read_rds(sprintf('Bootstraps/region_discovery_similarity_boot%s.rds', n_boot))
 }
 
-
 ################################################################################
 # AGGREGATION
 ################################################################################
@@ -78,13 +77,6 @@ if(SIMULATE){
 region_sim_norm <- region_output %>%
   group_by(worldbank_region) %>%
   mutate(norm_sim = scale(region_similarity))
-
-# finite-difference derivative of a GAM smooth at a given day
-get_gam_derivative <- function(model, date_num, eps = 1) {
-  pred_forward <- predict(model, newdata = tibble(date_num = date_num + eps), type = 'response')
-  pred_backward <- predict(model, newdata = tibble(date_num = date_num - eps), type = 'response')
-  as.numeric((pred_forward - pred_backward) / (2 * eps))
-}
 
 # make a global reference
 global_ref <- region_sim_norm %>%
@@ -171,33 +163,35 @@ gam_boot_agg <- gam_boot %>%
 # save plot for main figure
 plot_save('Main/within_region_discovery_similarity_over_time', c(130, 80))
 
-# Report derivatives of the GAM smooth at key timepoints
-derivative_dates <- tibble(
-  window = c('3 months prior', '1 month after'),
-  eval_date = c(WAR_START - 90, WAR_START + 30)
-)
-
-decline_coef <- region_output %>%
+# Report simple linear time trends on the raw similarity scale
+decline_trend <- region_output %>%
   filter(worldbank_region == 'Post-Soviet') %>%
   mutate(
     date = as.Date(date),
-    date_num = as.numeric(date)
+    date_num = as.numeric(date),
+    period = ifelse(date < WAR_START, 'pre', 'post')
   )
 
-# fit GAMs on the raw similarity scale and evaluate the first derivative
-decline_gam <- decline_coef %>%
-  group_by(boot) %>%
+decline_lm <- decline_trend %>%
+  group_by(boot, period) %>%
   group_modify(~ {
-    gam_model <- gam::gam(region_similarity ~ s(date_num, 2), data = .x)
-    derivative_dates %>%
-      mutate(derivative = purrr::map_dbl(as.numeric(eval_date), ~ get_gam_derivative(gam_model, .x)))
+    fit <- lm(region_similarity ~ date_num, data = .x)
+    tibble(
+      n_days = nrow(.x),
+      slope = unname(coef(fit)[['date_num']])
+    )
   }) %>%
   ungroup()
 
+decline_lm_agg <- decline_lm %>%
+  group_by(period) %>%
+  reframe(
+    n_boot = n(),
+    get_boot_mean_ci(slope, 'slope', obs_stat = 0, p_parametric = FALSE)
+  )
+
 # report stats
-decline_gam %>%
-  group_by(window) %>%
-  reframe(get_boot_mean_ci(derivative, 'derivative'))
+decline_lm_agg
 
 
 ################################################################################

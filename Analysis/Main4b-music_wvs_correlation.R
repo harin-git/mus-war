@@ -1,130 +1,142 @@
 #' Correlations between local music proportion and socio-cultural values
 #' Related to Fig. 4 in paper
 
-# load study-wide functions and global variables
 source('utils.R')
-require(sf) # for spatial mapping
-require(psych) # for correlation test
+require(sf)
+require(psych)
 
+################################################################################
+# SETTINGS
+################################################################################
+COUNTRY_CODE <- 'RU'   # 'UA' or 'RU'
+GLOBAL <- FALSE         # if TRUE use global results, otherwise per-country
+TYPE <- 'pca'           # 'iw' for Inglehart-Welzel dimensions (main), 'pca' for PCA loadings (SI)
 
 ################################################################################
 # PREPARATION
 ################################################################################
-COUNTRY_CODE <- 'UA'
-GLOBAL <- TRUE # when true, use the global PC results, otherwise do separetely for UA and RU
-
 city_meta <- read_rds('Dataset/meta/city_metadata.rds')
 
-find_closest_point <- function(lon, lat, dataset) {
+find_closest_music_city <- function(lon, lat, dataset) {
   d <- geosphere::distVincentySphere(c(lon, lat), cbind(dataset$lon, dataset$lat))
   closest_index <- which.min(d)
-  city_name <- dataset[closest_index, ]$city_name
-  nodeID <- dataset[closest_index, ]$nodeID
-  local_music_change <- dataset[closest_index, ]$pre_post_change
-  
-  return(tibble(nodeID, city_name, distance = min(d), local_music_change))
+  dataset[closest_index, ] %>%
+    transmute(
+      nodeID,
+      music_city = city_name,
+      music_lat = lat,
+      music_lon = lon,
+      pre,
+      post,
+      pre_post_change,
+      distance = min(d)
+    )
 }
 
 switch(COUNTRY_CODE,
-       UA = {
-         LOCAL_MUSIC <- read_rds("Dataset/lyrics/ukranian_lyrics_change_by_city.rds")
-         LOCAL_MUSIC <- LOCAL_MUSIC %>% 
-           left_join(city_meta) %>%
-           filter(country_code == COUNTRY_CODE)
-         PCA <- read_rds("Dataset/wvs/UA_wvs_pca_loadings.rds")
-         COLOR_GRADIENT <- c(UKRAINE_COLOUR2, UKRAINE_COLOUR)
-       },
-       RU = {
-         # load census data
-         CENSUS <- read_rds('Dataset/census/russia_census_2021_clean.rds')
-         LOCAL_MUSIC <- read_rds("Dataset/lyrics/russian_lyrics_change_by_city.rds") 
-         LOCAL_MUSIC <- LOCAL_MUSIC %>% 
-           left_join(city_meta) %>%
-           filter(country_code == COUNTRY_CODE)
-
-         PCA <- read_rds("Dataset/wvs/RU_wvs_pca_loadings.rds")
-         COLOR_GRADIENT <- c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2)
-       }
+  UA = {
+    LOCAL_MUSIC <- read_rds("Dataset/lyrics/ukranian_lyrics_change_by_city.rds") %>%
+      left_join(city_meta) %>%
+      filter(country_code == COUNTRY_CODE)
+    COLOR_GRADIENT <- c(UKRAINE_COLOUR2, UKRAINE_COLOUR)
+  },
+  RU = {
+    CENSUS <- read_rds('Dataset/census/russia_census_2021_clean.rds') %>%
+      filter(!is.na(iso_3166_2)) %>%
+      distinct(iso_3166_2, .keep_all = TRUE)
+    LOCAL_MUSIC <- read_rds("Dataset/lyrics/russian_lyrics_change_by_city.rds") %>%
+      left_join(city_meta) %>%
+      filter(country_code == COUNTRY_CODE)
+    COLOR_GRADIENT <- c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2)
+  }
 )
 
-# if using global loadings, override with global PCA results
-if(GLOBAL){PCA <- read_rds('Dataset/wvs/global_wvs_pca_loadings.rds')}
-
+WVS_DATA <- switch(TYPE,
+  pca = {
+    d <- switch(COUNTRY_CODE,
+      UA = read_rds("Dataset/wvs/UA_wvs_pca_loadings.rds"),
+      RU = read_rds("Dataset/wvs/RU_wvs_pca_loadings.rds")
+    )
+    if (GLOBAL) d <- read_rds('Dataset/wvs/global_wvs_pca_loadings.rds') %>% filter(country_code == COUNTRY_CODE)
+    d
+  },
+  iw = {
+    d <- switch(COUNTRY_CODE,
+      UA = read_rds("Dataset/Inglehart_Welzel/UA_wvs_iw_scores.rds"),
+      RU = read_rds("Dataset/Inglehart_Welzel/RU_wvs_iw_scores.rds")
+    )
+    if (GLOBAL) d <- read_rds('Dataset/Inglehart_Welzel/Global_wvs_iw_scores.rds') %>% filter(country_code == COUNTRY_CODE)
+    d
+  }
+)
 
 ################################################################################
 # MATCHING
 ################################################################################
-# get iso_3166_2 for Russian shazam cities
-sf_use_s2(FALSE)
-map <- read_rds('Dataset/census/world_map.rds')
-crs <-  "+proj=longlat +datum=WGS84"
-sf_map <- map %>% st_as_sf(CRS = crs)
-
-# project to map and get the closest regions
-region_points <- LOCAL_MUSIC %>%
-  select(lon, lat) %>%
-  st_as_sf(coords = c("lon", "lat"), crs = crs)
-mapping <- st_within(region_points, sf_map) %>% as.character() %>% as.numeric()
-mapped_regions <- map[mapping, ] %>% as_tibble() %>% select(iso_3166_2)
-mapped_regions$nodeID <- LOCAL_MUSIC$nodeID
-
-# join back to local music
-plot_data_agg <- LOCAL_MUSIC %>%
-  left_join(mapped_regions) %>%
-  left_join(PCA %>% select(iso_3166_2, PC1:PC3)) %>%
+plot_data_agg <- WVS_DATA %>%
+  rowwise() %>%
+  mutate(find_closest_music_city(lon, lat, LOCAL_MUSIC), .after = lon) %>%
+  ungroup() %>%
+  filter(distance < 1e5) %>%
   na.omit() %>%
-  ungroup()
+  ungroup() %>%
+  mutate(percent_change = scale(pre_post_change / sum(pre + post) * 100))
 
-# make pre and post change %
-plot_data_agg <- plot_data_agg %>%
-  mutate(abs_percent_change = scale(abs(pre_post_change / sum(pre + post)) * 100))
+message(sprintf('There are %s matched WVS locations in %s (%s)', nrow(plot_data_agg), COUNTRY_CODE, TYPE))
 
-message(sprintf('There are %s regions in %s', n_distinct(plot_data_agg$iso_3166_2), COUNTRY_CODE))
-
-# add city type information
-plot_data_agg <- switch (COUNTRY_CODE,
+plot_data_agg <- switch(COUNTRY_CODE,
   UA = plot_data_agg %>% mutate(city_type = case_when(
-    city_name %in% c('Sebastopol', 'Donetsk', 'Kerch', 'Luhansk', 'Mariupol') ~ 'Occupied',
+    music_city %in% c('Sebastopol', 'Donetsk', 'Kerch', 'Luhansk', 'Mariupol') ~ 'Occupied',
     TRUE ~ 'Not occupied'
   )),
-  RU = plot_data_agg %>%
-    left_join(CENSUS)
+  RU = plot_data_agg %>% left_join(CENSUS, by = 'iso_3166_2')
 )
-
 
 ################################################################################
 # CORRELATIONS
-#######################################s#########################################
-# test correlation
-cor_result <- corr.test(plot_data_agg %>% select(abs_percent_change, PC1:PC3), adjust = 'bonferroni', method = 'spearman')
-print(cor_result, short=FALSE) 
-print(cor_result$stars, quote=FALSE, short=FALSE) 
+################################################################################
+dims <- switch(TYPE,
+  pca = paste0('PC', 1:3),
+  iw  = c('trad_secular', 'survival_selfexpr')
+)
 
-# plot the correlation
-message(sprintf('Plotting the correlation between local music and PCA for %s', COUNTRY_CODE))
+dimension_labels <- switch(TYPE,
+  pca = setNames(paste0('PC', 1:3), paste0('PC', 1:3)),
+  iw  = c(trad_secular = 'Traditional vs.\n Secular-rational',
+           survival_selfexpr = 'Survival vs.\n Self-expression')
+)
 
-for (i in 1:3) {
-  PC <- paste0('PC', i)
-  
+cor_result <- corr.test(
+  plot_data_agg %>% select(percent_change, all_of(dims)),
+  adjust = 'bonferroni',
+  method = 'spearman'
+)
+print(cor_result, short = FALSE)
+print(cor_result$stars, quote = FALSE, short = FALSE)
+
+message(sprintf('Plotting the correlation between local music and %s for %s', TYPE, COUNTRY_CODE))
+
+for (dim_name in dims) {
   p <- plot_data_agg %>%
-    ggplot(aes(pre_post_change * 100, !!sym(PC))) +
+    ggplot(aes(pre_post_change * 100, !!sym(dim_name))) +
     geom_smooth(method = 'glm', colour = 'gray50') +
     geom_point(aes(colour = city_type), size = 1, alpha = 0.5) +
-    scale_colour_manual(values = COLOR_GRADIENT, guide = F)
-  
-  # save plot for main and SI figures
-  if((PC == 'PC3')){
-    p + labs(x = 'Local music (%)', y = 'Socio-cultural values')
-    plot_save(sprintf('Main/%s_%s_%s_correlation', COUNTRY_CODE, 'music', PC), c(40, 50))
-  } else {
-    p +  
-      ggpubr::stat_cor(r.accuracy = 0.01, 
-                       p.accuracy = 0.01, 
-                       cor.coef.name = 'rho', 
-                       method = 'spearman',
-                       size = 3) +
-      labs(x = 'Local music (%)', y = PC)
-    plot_save(sprintf('SI/%s_%s_%s_correlation', COUNTRY_CODE, 'music', PC), c(40, 50))
-  }
-}
+    scale_colour_manual(values = COLOR_GRADIENT, guide = 'none')
 
+  is_main <- (TYPE == 'iw')
+  folder <- if (is_main) 'Main' else 'SI'
+
+  if (!is_main) {
+    p <- p + ggpubr::stat_cor(
+      r.accuracy = 0.01,
+      p.accuracy = 0.01,
+      cor.coef.name = 'rho',
+      method = 'spearman',
+      size = 3
+    )
+  }
+
+  p + labs(x = 'Local music (%)', y = dimension_labels[[dim_name]])
+
+  plot_save(sprintf('%s/%s_music_%s_correlation', folder, COUNTRY_CODE, dim_name), c(40, 50))
+}
