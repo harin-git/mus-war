@@ -72,21 +72,50 @@ options(
   book.base_size = 10
 )
 
-# set default theme
-theme_set(
-  theme_classic(
-    base_size = getOption("book.base_size"), 
-    base_family = getOption("book.base_family")
-  ) %+replace% 
-    theme(
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      legend.position = "bottom",
-      plot.title = element_text(hjust = 0.5, size = 12),
-      plot.subtitle = element_text(hjust = 0.5, size = 10)
-    )
-)
+# Publication figure settings (Nature Portfolio artwork guide). Applied to every plot through theme_set().
+FULL_W  <- 180       # mm, 2-column width
+HALF_W  <- 88        # mm, 1-column width
+MAX_H   <- 185       # mm, max figure height
+FONT    <- 'Arial'   # sans-serif
+TXT_MIN <- 5; TXT_MAX <- 7   # pt
+BASE    <- 6.5       # pt, base text size
+RASTER_DPI <- 300    # min resolution of embedded bitmaps at final size
+LW      <- 0.25      # standard line width (~0.53 pt)
+LW_MIN  <- 0.12      # thinnest hairline (~0.26 pt)
+PT      <- 1 / .pt   # pt -> ggplot text size units
+raster_n <- function(width_mm) ceiling(width_mm / 25.4 * RASTER_DPI * 1.05)  # grid cells needed across a panel
 
+theme_pub <- function(base = BASE) {
+  theme_classic(base_size = base, base_family = FONT) +
+    theme(
+      line = element_line(linewidth = LW),
+      axis.line = element_line(linewidth = LW, colour = 'black'),
+      axis.ticks = element_line(linewidth = LW, colour = 'black'),
+      axis.ticks.length = unit(0.8, 'mm'),
+      axis.text = element_text(size = base - 0.5, colour = 'black'),
+      axis.title = element_text(size = base),
+      strip.background = element_blank(),
+      strip.text = element_text(size = base, face = 'plain', margin = margin(0.5, 0, 0.8, 0, 'mm')),
+      legend.title = element_text(size = base),
+      legend.text = element_text(size = base - 0.5),
+      legend.key.size = unit(2.5, 'mm'),
+      legend.background = element_blank(),
+      plot.title = element_text(size = base, face = 'plain', hjust = 0),
+      plot.margin = margin(1, 1, 1, 1, 'mm'),
+      panel.spacing = unit(2, 'mm')
+    )
+}
+theme_set(theme_pub())
+
+# facet strips as boxes (theme_classic default weight), used for the faceted trend plots
+strip_box <- theme(strip.background = element_rect(fill = 'white', colour = 'black', linewidth = rel(2)),
+                   strip.text = element_text(size = TXT_MAX, margin = margin(0.6, 0, 0.6, 0, 'mm')))
+
+# map style for all maps: no frame or grid, lat/long axis labels
+theme_map_axes <- function(base = BASE) theme_pub(base) + theme(axis.line = element_blank(), axis.title = element_blank())
+lon_lab <- function(x) ifelse(x == 0, '0°', ifelse(x < 0, paste0(-x, '°W'), paste0(x, '°E')))
+lat_lab <- function(x) ifelse(x == 0, '0°', ifelse(x < 0, paste0(-x, '°S'), paste0(x, '°N')))
+date_x <- scale_x_date(date_breaks = '1 month', date_labels = '%b', expand = expansion(mult = 0.01))
 
 theme_map <- function(...) {
   background_col <- 'white'
@@ -170,6 +199,10 @@ WORLDBANK_REGION_COLOUR <- tibble(
   )
 )
 
+LANG_COLS <- c(Ukrainian = UKRAINE_COLOUR, Russian = RUSSIAN_COLOUR, Kazakh = KAZAKHSTAN_COLOUR,
+               English = ENGLISH_COLOUR, Other = 'grey60')
+REGION_COLS <- setNames(WORLDBANK_REGION_COLOUR$region_colour, WORLDBANK_REGION_COLOUR$worldbank_region)
+
 ################################################################################
 # STATISTICS
 ################################################################################
@@ -194,33 +227,23 @@ get_t_stat <- function(group1, group2){
   tibble(t, p, mean_diff, lower_ci, upper_ci, pooled_sd, cohensD)
 }
 
-# for bootstrap confidence estimates
-get_boot_mean_ci <- function(x, var_name, obs_stat = 0, p_parametric = TRUE, alpha = 0.05, ...){
-  low <- alpha / 2
-  high <- 1 - alpha / 2
-  
-  if(p_parametric){
-    # parametric p-value
-    z_score <- (mean(x) - obs_stat) / sd(x)
-    p <- signif(2 * pnorm(-abs(z_score)), 3)  # two-tailed
-  } else {
-    # non-parametric p-value using empirical CDF
-    ecdf_func <- ecdf(x)
-    p <- signif(2 * min(ecdf_func(obs_stat), 1 - ecdf_func(obs_stat)), 3)  # two-tailed
-  }
-
-  # make t-stat labels
-  p_labels <- ifelse(p >= 0.05, 'ns', ifelse(p < 0.001, '***', ifelse(p < 0.01, '**', '*')))
-  
+# for bootstrap confidence estimates: mean, 95% percentile CI, bootstrap z and two-tailed P
+# (z = (mean - null) / bootstrap SD, P from the standard normal; p_perc = two-tailed percentile P)
+get_boot_mean_ci <- function(x, var_name, obs_stat = 0, alpha = 0.05, ...){
+  x <- x[is.finite(x)]
+  z <- (mean(x) - obs_stat) / sd(x)
   output <- tibble(m = mean(x),
-         lower_ci = quantile(x, low),
-         upper_ci = quantile(x, high),
-         p,
-         p_labels
-         )
+                   lower_ci = unname(quantile(x, alpha / 2)),
+                   upper_ci = unname(quantile(x, 1 - alpha / 2)),
+                   z = z,
+                   p = 2 * pnorm(-abs(z)),
+                   p_perc = min(1, 2 * min(mean(x <= obs_stat), mean(x >= obs_stat))))
   colnames(output) <- paste(var_name, colnames(output), sep = '_')
   return(output)
 }
+
+# report a P value as in the paper (three decimals, < 0.001 below)
+fmt_p <- function(p) ifelse(p < 0.001, 'P < 0.001', sprintf('P = %.3f', p))
 
 # for standard error
 SE <- function(x){
@@ -479,37 +502,59 @@ get_edges_within_regions = function(all_regions, pre_network, post_network){
 ################################################################################
 # PLOTTING
 ################################################################################
-# for saving plots. Defaults to making both PNG and PDF versions.
-plot_save <- function(plot_name, size = c(183, 100), pdf = TRUE){ 
-  # if no dir called Plots, make one
-  if(!dir.exists('Plots')){
-    dir.create('Plots/Main', recursive = TRUE)
-    dir.create('Plots/SI', recursive = TRUE)
-    }
-  
-  # default size for journal is 183mm wide
-  message(sprintf('saving plot to: %s', plot_name))
-  
-  # saves both pdf and png versions of the plot
-  if(pdf){ # when too much data pdf becomes too large
-    ggsave(
-      filename = paste0(plot_name, '.pdf'),
-      width = size[1],
-      height = size[2],
-      units = 'mm',
-      path = 'Plots',
-      dpi = 'print',
-      device = 'pdf'
-    )
+# Save the last (or given) plot at its printed size in mm: editable SVG, a PDF made from the SVG (for linked
+# placement in Illustrator), a 300-dpi PNG, and the plotted data as a source-data CSV when `data` is given.
+# Output goes to Plots/ (or the PLOT_DIR environment variable).
+plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last_plot()){
+  root <- Sys.getenv('PLOT_DIR', 'Plots')
+  f <- file.path(root, plot_name)
+  dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
+  message(sprintf('saving plot to: %s', f))
+  svglite::svglite(paste0(f, '.svg'), width = size[1] / 25.4, height = size[2] / 25.4, fix_text_size = FALSE)
+  print(plot); invisible(dev.off())
+  rsvg::rsvg_pdf(paste0(f, '.svg'), paste0(f, '.pdf'))
+  ggsave(paste0(f, '.png'), plot, width = size[1], height = size[2], units = 'mm', dpi = 300, bg = 'white')
+  if(!is.null(data)){
+    sd <- file.path(root, 'source_data'); dir.create(sd, showWarnings = FALSE)
+    write_csv(data, file.path(sd, paste0(gsub('/', '_', plot_name), '.csv')))
   }
-  
-  ggsave(
-    filename = paste0(plot_name, '.png'),
-    width = size[1],
-    height = size[2],
-    units = 'mm',
-    path = 'Plots',
-    dpi = 'print',
-    device = 'png'
-  )
+  check_panel(paste0(f, '.svg'), size[1], size[2])
+  invisible(plot)
+}
+
+# Check an exported SVG against the artwork guide (size, 5-7 pt text, lines >= 0.25 pt, bitmaps >= 300 dpi); warns only
+check_panel <- function(svg, w, h) {
+  s <- paste(readLines(svg, warn = FALSE), collapse = '\n')
+  issues <- c()
+  if (w > FULL_W) issues <- c(issues, sprintf('width %s mm > %s mm', w, FULL_W))
+  if (h > MAX_H)  issues <- c(issues, sprintf('height %s mm > %s mm', h, MAX_H))
+  fs <- as.numeric(regmatches(s, gregexpr("(?<=font-size: )[0-9.]+(?=px)", s, perl = TRUE))[[1]])
+  if (length(fs) && (min(fs) < TXT_MIN - 0.01 || max(fs) > TXT_MAX + 0.01))
+    issues <- c(issues, sprintf('text %.1f-%.1f pt (allowed %s-%s)', min(fs), max(fs), TXT_MIN, TXT_MAX))
+  sw <- as.numeric(regmatches(s, gregexpr("(?<=stroke-width: )[0-9.]+", s, perl = TRUE))[[1]]); sw <- sw[sw > 0]
+  if (length(sw) && min(sw) < 0.25) issues <- c(issues, sprintf('hairline %.2f pt < 0.25 pt', min(sw)))
+  im <- regmatches(s, gregexpr("<image width='[0-9.]+'[^>]*base64,[A-Za-z0-9+/=]+", s))[[1]]
+  for (x in im) {
+    wpt <- as.numeric(sub("<image width='([0-9.]+)'.*", '\\1', x))
+    raw <- jsonlite::base64_dec(substr(sub('.*base64,', '', x), 1, 64))
+    px <- sum(as.integer(raw[17:20]) * 256^(3:0))
+    if (px / (wpt / 72) < RASTER_DPI * 0.95) issues <- c(issues, sprintf('embedded bitmap %.0f dpi < %s dpi', px / (wpt / 72), RASTER_DPI))
+  }
+  if (length(issues)) warning(basename(svg), ': ', paste(unique(issues), collapse = '; '), call. = FALSE)
+  invisible(issues)
+}
+
+# Embedded raster layer for dense surfaces (KDE, smoothed maps): one image in the SVG instead of thousands of tiles.
+# df must be a regular grid; empty rows/columns stay transparent so the image keeps its position.
+raster_layer <- function(df, x, y, value, low, high, limits = range(df[[value]], na.rm = TRUE), interpolate = TRUE) {
+  step <- function(v) { d <- diff(v); min(d[d > 1e-9]) }
+  sx <- step(sort(unique(df[[x]]))); sy <- step(sort(unique(df[[y]])))
+  xs <- seq(min(df[[x]]), max(df[[x]]) + sx / 2, by = sx); ys <- seq(min(df[[y]]), max(df[[y]]) + sy / 2, by = sy)
+  m <- matrix(NA_real_, nrow = length(ys), ncol = length(xs))
+  m[cbind(round((df[[y]] - min(ys)) / sy) + 1, round((df[[x]] - min(xs)) / sx) + 1)] <- df[[value]]
+  ramp <- scales::col_numeric(c(low, high), domain = limits, na.color = NA, alpha = TRUE)
+  img <- matrix(ramp(pmin(pmax(m, limits[1]), limits[2])), nrow = nrow(m))
+  img <- img[nrow(img):1, , drop = FALSE]
+  hx <- diff(xs[1:2]) / 2; hy <- diff(ys[1:2]) / 2
+  annotation_raster(img, xmin = min(xs) - hx, xmax = max(xs) + hx, ymin = min(ys) - hy, ymax = max(ys) + hy, interpolate = interpolate)
 }
