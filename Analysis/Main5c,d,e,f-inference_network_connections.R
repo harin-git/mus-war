@@ -8,7 +8,7 @@ source('utils.R')
 ################################################################################
 # PREPARATION
 ################################################################################
-SIMULATE <- FALSE # if FALSE, pre-computed bootstrap is loaded
+SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 # load the node dictionary
 node_dict <- read_rds('Dataset/meta/city_metadata.rds') %>%
@@ -17,8 +17,8 @@ node_dict <- read_rds('Dataset/meta/city_metadata.rds') %>%
 all_regions <- node_dict$worldbank_region %>% unique()
 
 ## load raw bootstrapped edges
-pre_edge <- read_rds('Bootstraps/pre_netinf_boot1000.rds')
-post_edge <- read_rds('Bootstraps/post_netinf_boot1000.rds')
+# Raw saved edge draws are loaded only inside the optional resampling branch.
+# This script never invokes NETINF.
 
 # if TRUE, the trimming of dense edges is performed
 trim_edge <- TRUE
@@ -30,7 +30,9 @@ trim_percent <- 5  # if trim_edge is TRUE, the edges below the percentage thresh
 ################################################################################
 n_boot <- 1000
 
-if(SIMULATE){
+if(SIMULATION){
+  pre_edge <- read_rds('Bootstraps/pre_netinf_boot1000.rds')
+  post_edge <- read_rds('Bootstraps/post_netinf_boot1000.rds')
   # Define all region combination grid 8^2 resulting as 56 rows
   region_mat <- expand.grid(all_regions, all_regions)
   colnames(region_mat) <- c('source_region', 'target_region')
@@ -159,6 +161,19 @@ if(SIMULATE){
 }
 
 
+# Statistical tables use the same staging root as plots and source data.
+statistics_dir <- file.path(Sys.getenv('PLOT_DIR', 'Plots'), 'statistics')
+dir.create(statistics_dir, recursive = TRUE, showWarnings = FALSE)
+
+################################################################################
+# GLOBAL NETWORK CORRELATION (DESCRIPTIVE ONLY)
+################################################################################
+global_r <- read_rds('Bootstraps/global_network_cor_boot1000.rds')
+# City-pair entries share cities; do not attach a city-pair correlation P value.
+write_csv(tibble(B = sum(is.finite(global_r$r)), r = mean(global_r$r),
+                       lower_95ci = unname(quantile(global_r$r, .025)),
+                       upper_95ci = unname(quantile(global_r$r, .975))), file.path(statistics_dir, 'network_global_r_descriptive.csv'))
+
 ################################################################################
 # WITHIN REGION CONNECTION CHANGE
 ################################################################################
@@ -187,7 +202,7 @@ within_connect_change <- within_connect %>%
           )
 
 # plot the changes
-within_connect_change %>%
+within_plot <- within_connect_change %>%
   rename(worldbank_region = region) %>%
   left_join(WORLDBANK_REGION_COLOUR) %>%
   ggplot(aes(reorder(worldbank_region, - connect_change_m), connect_change_m, colour = region_colour)) +
@@ -199,7 +214,7 @@ within_connect_change %>%
   scale_colour_identity()
 
 # save plot for SI
-plot_save('SI/connection_percent_change', c(120, 100))
+plot_save('SI/connection_percent_change', c(120, 100), within_connect_change, within_plot)
 
 
 ################################################################################
@@ -254,7 +269,7 @@ post_soviet_inout_agg <- post_soviet_inout %>%
 # report stats
 post_soviet_inout_agg
 
-post_soviet_inout_agg %>%
+between_plot <- post_soviet_inout_agg %>%
   filter(!is.infinite(all_change_m)) %>%
   left_join(WORLDBANK_REGION_COLOUR %>% rename(region = worldbank_region)) %>%
   ggplot(aes(reorder(region, all_change_m), all_change_m, ymin = all_change_lower_ci, ymax = all_change_upper_ci, fill = region_colour)) +
@@ -265,128 +280,76 @@ post_soviet_inout_agg %>%
   scale_fill_identity() +
   labs(y = 'Percentage change in number of edges (%)', x = '', title = '')
 
-plot_save('SI/post_soviet_w_other_regions_connection_change', c(120, 50))
+plot_save('SI/post_soviet_w_other_regions_connection_change', c(120, 50), post_soviet_inout_agg, between_plot)
 
+
+# Inference uses one change per saved bootstrap, not a t-test across draws.
+within_stats <- within_connect %>% group_by(source_region) %>%
+  reframe(boot_test(connect_change_percent), pre = mean(n_pre), post = mean(n_post))
+write_csv(within_stats, file.path(statistics_dir, 'within_edge_change.csv'))
+within_wide <- within_connect %>% select(boot, source_region, connect_change_percent) %>%
+  pivot_wider(names_from = source_region, values_from = connect_change_percent)
+write_csv(map_dfr(setdiff(names(within_wide), c('boot', 'Post-Soviet')), function(other) {
+  boot_test(abs(within_wide$`Post-Soviet`) / abs(within_wide[[other]]), null = 1) %>% mutate(vs = other)
+}), file.path(statistics_dir, 'postsoviet_edge_change_ratios.csv'))
+write_csv(post_soviet_inout %>% select(boot, region, out_change, in_change, all_change) %>%
+  pivot_longer(ends_with('_change'), names_to = 'direction') %>% group_by(region, direction) %>%
+  reframe(boot_test(value)), file.path(statistics_dir, 'postsoviet_between_edge_change.csv'))
 
 ################################################################################
 # UKRAINIAN AND RUSSIAN CITIES WITH EUROPE
 ################################################################################
-soviet_europe_connection <- boot_output$soviet_europe %>% filter(country_code %in% c('UA', 'RU'))
-soviet_europe_connection <- soviet_europe_connection %>%
-  mutate(outgoing = post_out - pre_out,
-         incoming = post_in - pre_in) %>%
-  mutate(total = outgoing + incoming)
+se <- boot_output$soviet_europe %>% filter(country_code %in% c('UA','RU')) %>%
+  mutate(Outgoing = post_out - pre_out, Incoming = post_in - pre_in)
+city <- se %>% group_by(country_code, city) %>% summarise(across(c(Outgoing, Incoming), mean), .groups = 'drop') %>%
+  pivot_longer(c(Outgoing, Incoming), names_to = 'direction', values_to = 'new_edges')
+ctry <- se %>% group_by(country_code, boot) %>% summarise(across(c(Outgoing, Incoming), mean), .groups = 'drop') %>%
+  pivot_longer(c(Outgoing, Incoming), names_to = 'direction') %>% group_by(country_code, direction) %>%
+  summarise(mean = mean(value), lower_95ci = quantile(value, .025), upper_95ci = quantile(value, .975), .groups = 'drop')
+lab <- function(x) mutate(x, country = factor(country_code, c('RU','UA'), c('Russia','Ukraine')),
+                          direction = factor(direction, c('Incoming','Outgoing'), c('Incoming edges from Europe','Outgoing edges to Europe')))
+set.seed(1)
+pe <- ggplot(lab(city), aes(new_edges, country, colour = country)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', linewidth = LW) +
+  geom_jitter(height = 0.12, width = 0, shape = 21, size = 1, stroke = 0.3) +
+  geom_pointrange(data = lab(ctry), aes(x = mean, xmin = lower_95ci, xmax = upper_95ci), size = 0.7, linewidth = 0.5) +
+  facet_wrap(~ direction) +
+  scale_colour_manual(values = c(Russia = RUSSIAN_COLOUR, Ukraine = UKRAINE_COLOUR), guide = 'none') +
+  labs(x = 'Number of new edges', y = NULL)
+plot_save('Fig5/e_new_edges_europe', c(75, 55),
+           bind_rows(lab(city) %>% mutate(level = 'city'), lab(ctry) %>% mutate(level = 'country (bootstrap)')) %>%
+             select(level, country, city, direction, new_edges, mean, lower_95ci, upper_95ci), pe)
 
-# aggregate the edges
-soviet_europe_agg <- soviet_europe_connection %>%
-  group_by(country_code, city) %>%
-  reframe(get_boot_mean_ci(outgoing, 'outgoing'),
-          get_boot_mean_ci(incoming, 'incoming')
-          )
-
-soviet_europe_agg$country_code <- factor(soviet_europe_agg$country_code, levels = c('RU', 'UA'), labels = c('Russia', 'Ukraine'))
-
-# plot the outgoing and incoming
-soviet_europe_long <- soviet_europe_agg %>%
-  select(country_code, city, outgoing_m, incoming_m) %>%
-  pivot_longer(c(outgoing_m, incoming_m))
-soviet_europe_long$name <- factor(soviet_europe_long$name, levels = c('incoming_m', 'outgoing_m'), labels = c('Incoming edges from Europe', 'Outgoing edges to Europe'))
-
-soviet_country_mean <- soviet_europe_long %>%
-  group_by(country_code, name) %>%
-  summarise(m = mean(value),
-            sd = sd(value),
-            e = CI(value)) %>%
-  mutate(lower_ci = m - e,
-         upper_ci = m + e)
-
-soviet_europe_long %>%
-  ggplot(aes(value, country_code, colour = country_code)) +
-  geom_jitter(width = 0.1, alpha = 1, shape=21, size = 1.5) +
-  # add mean values
-  geom_pointrange(data = soviet_country_mean, aes(m, country_code, xmin = lower_ci, xmax = upper_ci), size = 1) +
-  labs(x = 'Number of new edges', y = '') +
-  geom_hline(yintercept = 0, linetype = 'dashed') +
-  geom_vline(xintercept = 0, linetype = 'dashed') +
-  scale_colour_manual(values = c(RUSSIAN_COLOUR, UKRAINE_COLOUR), guide = 'none') +
-  theme_classic() +
-  facet_wrap(~ name, nrow = 1)
-
-# save plot for SI
-plot_save('SI/outgoing_incoming_connections_w_europe', c(120, 80))
-
-# report stats at the country level mean
-stast_country_soviet_europe <- soviet_europe_connection %>%
-  group_by(country_code, boot) %>%
-  summarise(total = mean(total)) %>%
-  group_by(country_code) %>%
-  reframe(
-    get_boot_mean_ci(total, 'total')
-  )
-
-stast_country_soviet_europe
-
-# find which are the top outliers and label in figure
-soviet_europe_agg %>%
-  group_by(country_code) %>%
-  arrange(-outgoing_m) %>%
-  slice(1:3)
-
+# Country means and contrasts are paired by bootstrap ID (private s06/s12 method).
+country_draws <- se %>% mutate(Total = Outgoing + Incoming) %>% group_by(country_code, boot) %>%
+  summarise(across(c(Outgoing, Incoming, Total), mean), .groups = 'drop')
+write_csv(country_draws %>% pivot_longer(c(Outgoing, Incoming, Total), names_to = 'direction') %>%
+  group_by(country_code, direction) %>% reframe(boot_test(value)), file.path(statistics_dir, 'new_edges_country_boot.csv'))
+country_wide <- country_draws %>% pivot_wider(names_from = country_code, values_from = c(Outgoing, Incoming, Total))
+write_csv(bind_rows(
+  boot_test(country_wide$Total_UA - country_wide$Total_RU) %>% mutate(contrast = 'UA - RU total new edges'),
+  boot_test(country_wide$Outgoing_UA - country_wide$Incoming_UA) %>% mutate(contrast = 'UA outgoing - incoming'),
+  boot_test(country_wide$Outgoing_RU - country_wide$Incoming_RU) %>% mutate(contrast = 'RU outgoing - incoming')
+), file.path(statistics_dir, 'new_edges_contrasts.csv'))
 
 ################################################################################
 # CITIES IN EUROPE THAT MADE NEW CONNECTIONS
 ################################################################################
-# which cities in Europe got most of the Post-Soviet influences?
-# map the locations
-library(maps)
-library(eurostat)
-library(sf)
-library(giscoR)
-
-# Obtain map data for Europe
-euromap <- get_eurostat_geospatial(resolution = 10, 
-                                 nuts_level = 0, 
-                                 year = 2016)
-EU27 <- eu_countries %>% 
-  filter(code != 'UK') %>% 
-  select(geo = code, name)
-
-SHP_27 <- euromap %>% 
-  select(geo = NUTS_ID, geometry) %>% 
-  inner_join(EU27, by = "geo") %>% 
-  arrange(geo) %>% 
-  st_as_sf()
-
-# get lat long for european cities
-europe_soviet <- boot_output$europe_soviet %>% filter(soviet_country %in% c('UA', 'RU'))
-europe_soviet_agg <- europe_soviet %>%
-  group_by(country_code, city, soviet_country) %>%
-  summarise(connections = mean(post_in - pre_in)) %>%
-  filter(connections > 0)
-  
-europe_cities <- europe_soviet_agg %>% left_join(node_dict %>% select(city = city_name, lat, lon))
-europe_cities$soviet_country <- factor(europe_cities$soviet_country, levels = c('UA', 'RU'))
-
-# nudge the dots by longitude so they don't overlap
-europe_cities <- europe_cities %>%
-  group_by(city) %>%
-  arrange(city, soviet_country) %>%
-  mutate(order = 1:n()) %>%
-  mutate(lon = lon + (order/2))
-
-# transform to SF
-europe_cities_sf <- st_as_sf(europe_cities, coords = c("lon", "lat"), crs = 4326)
-europe_cities_transformed <- st_transform(europe_cities_sf, crs = st_crs(SHP_27))
-
-# save for SI
-SHP_27 %>% 
-  ggplot() +
-  geom_sf() +
-  geom_sf(data = europe_cities_transformed, aes(colour = soviet_country), size = 3) +
-  scale_x_continuous(limits = c(-3, 35)) +
-  scale_y_continuous(limits = c(45, 65)) +
-  theme_void() +
-  scale_colour_manual(values = c(UKRAINE_COLOUR, RUSSIAN_COLOUR), guide = F)
-
-plot_save('SI/map_europe_cities_post_soviet_connection', c(183, 183))
-
+# Base map follows the approved export, using maps::world, not a network download.
+nd <- read_rds('Dataset/meta/city_metadata.rds') %>% select(city = city_name, country_code, lat, lon)
+es <- boot_output$europe_soviet %>% filter(soviet_country %in% c('UA','RU')) %>%
+  group_by(country_code, city, soviet_country) %>% summarise(new_incoming = mean(post_in - pre_in), .groups = 'drop') %>%
+  filter(new_incoming > 0) %>% left_join(nd, by = c('city','country_code')) %>%
+  group_by(city) %>% arrange(soviet_country != 'UA', .by_group = TRUE) %>% mutate(lon_plot = lon + (row_number() - 1) * 0.5) %>% ungroup() %>%
+  mutate(from = factor(soviet_country, c('UA','RU'), c('Ukraine','Russia')))
+# same base map as Fig. 1 (maps::map_data('world'), grey95 land, grey50 borders)
+world_md <- ggplot2::map_data('world')
+pf <- ggplot() +
+  geom_polygon(data = world_md, aes(long, lat, group = group), fill = 'grey95', colour = 'grey50', linewidth = LW_MIN) +
+  geom_point(data = es, aes(lon_plot, lat, colour = from), size = 1.2, shape = 16) +
+  scale_colour_manual(values = c(Ukraine = UKRAINE_COLOUR, Russia = RUSSIAN_COLOUR), name = 'New edges formed with') +
+  coord_fixed(1.3, xlim = c(-3, 35), ylim = c(45, 65), expand = FALSE) +   # same aspect as Fig. 1
+  scale_x_continuous(breaks = seq(0, 30, 10), labels = lon_lab) + scale_y_continuous(breaks = seq(45, 65, 5), labels = lat_lab) +
+  theme_map_axes() + theme(legend.position = 'none', legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, 'mm'))
+plot_save('Fig5/f_europe_new_edges_map', c(88, 55),
+          es %>% select(country_code, city, from, lat, lon, new_incoming), pf)

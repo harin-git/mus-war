@@ -11,11 +11,11 @@ library(quanteda) # for text processing
 ################################################################################
 # SETUP
 ################################################################################
-SIMULATION <- TRUE # if FALSE, pre-computed bootstrap is loaded
+SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 # if TRUE, test the graph of war related songs for different thresholds of n closest words
-# otherwise use 5 as in the main study
-control <- TRUE
+# otherwise use 5 as in the main study (the control bootstraps are not saved, so control needs SIMULATION)
+control <- FALSE
 
 # n closest words to war words in the embedding
 if(control){
@@ -136,36 +136,40 @@ if(SIMULATION){
 ################################################################################
 # PLOT & STATS
 ################################################################################
-# plot the trajectories for the two countries
-war_traj <- war_boot_output %>% 
+# daily bootstrap mean and 95% CI (n = 180 days per country)
+war_traj <- war_boot_output %>%
   group_by(country_code, date, nclosest) %>%
-  reframe(get_boot_mean_ci(war_proportion, 'boot'))
+  summarise(mean = mean(war_proportion), lower_95ci = quantile(war_proportion, .025),
+            upper_95ci = quantile(war_proportion, .975), .groups = 'drop') %>%
+  mutate(date = as.Date(date), country = factor(country_code, c('UA', 'RU'), c('Ukraine', 'Russia')))
 
-war_traj %>%
-  ggplot(aes(as.Date(date), boot_m, colour = country_code, group = country_code)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = 'glm') +
-  scale_colour_manual(values = c(RUSSIAN_COLOUR, UKRAINE_COLOUR), guide = 'none') +
-  geom_vline(xintercept = WAR_START, linetype = 'dashed') +
-  scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "1 month") +
-  (if(control){facet_wrap(~ nclosest)}) +
-  (if(control){ggpubr::stat_cor(p.accuracy = 0.001, cor.coef.name = 'r')}) +
-  labs(x = '', y = 'War-related songs (%)')
+# points: daily bootstrap mean; lines: linear fit with 95% CI
+war_plot <- war_traj %>%
+  ggplot(aes(date, mean, colour = country, fill = country)) +
+  geom_point(size = 1, alpha = 0.5, shape = 16) +
+  geom_smooth(method = 'lm', formula = y ~ x, linewidth = 0.4) +
+  geom_vline(xintercept = WAR_START, linetype = 'dashed', linewidth = LW) +
+  scale_colour_manual(values = c(Ukraine = UKRAINE_COLOUR, Russia = RUSSIAN_COLOUR), name = NULL) +
+  scale_fill_manual(values = c(Ukraine = UKRAINE_COLOUR, Russia = RUSSIAN_COLOUR), guide = 'none') +
+  date_x + labs(x = NULL, y = 'War-related songs (%)') +
+  theme(legend.position = 'none') +
+  (if(control){facet_wrap(~ nclosest)})
 
-# report correlation statistics in the main text
-war_traj_cor <- war_traj %>%
-  select(country_code, date, boot_m) %>%
-  pivot_wider(names_from = country_code, values_from = boot_m)
-
-cor_result <- psych::corr.test(war_traj_cor %>% mutate(date = as.numeric(date)), adjust = 'bonferroni', method = 'pearson')
-print(cor_result, short=FALSE) 
-print(cor_result$stars, quote=FALSE, short=FALSE)
-
-# save plot for main figure
+# save plot for main figure (Fig. 3c) or the SI control (Supplementary Fig. 3c)
+war_source <- war_traj %>% select(country, nclosest, date, mean, lower_95ci, upper_95ci)
 if(!control){
-  plot_save('Main/war_related_songs_proportion', c(90, 50))
+  plot_save('Main/war_related_songs_proportion', c(65, 40), war_source %>% select(-nclosest), war_plot)
 } else {
-  plot_save('SI/different_closest_words_for_war_related_songs', c(183, 80))
+  plot_save('SI/different_closest_words_for_war_related_songs', c(FULL_W, 60), war_source, war_plot)
 }
 
-
+# correlation of the daily proportion with date using two-tailed Pearson r(df), 95% CI, Bonferroni-corrected for two tests
+war_traj %>%
+  group_by(country_code, nclosest) %>%
+  group_modify(~{
+    ct <- cor.test(as.numeric(.x$date), .x$mean, method = 'pearson')
+    tibble(r = unname(ct$estimate), df = unname(ct$parameter), lower_ci = ct$conf.int[1], upper_ci = ct$conf.int[2],
+           p = ct$p.value, p_bonferroni = min(1, ct$p.value * 2))
+  }) %>%
+  ungroup() %>%
+  print(width = Inf)

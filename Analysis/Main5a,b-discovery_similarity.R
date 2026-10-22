@@ -8,7 +8,7 @@ source('utils.R')
 ################################################################################
 # DATA PREPARATION
 ################################################################################
-SIMULATE <- FALSE # if FALSE, pre-computed bootstrap is loaded
+SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 # load raw 6 months data
 chart_data <- read_rds('Dataset/chart/study_set_chart.rds')
@@ -28,7 +28,7 @@ joined_data <- chart_data %>% ungroup() %>% left_join(city_region)
 # number of bootstraps to perform
 n_boot <- 1000
 
-if(SIMULATE){
+if(SIMULATION){
   # for each world region, calculate the similarity of music discovery between countries on each day
   region_store = list()
   for (i in 1:length(regions)) {
@@ -70,180 +70,69 @@ if(SIMULATE){
   region_output <- read_rds(sprintf('Bootstraps/region_discovery_similarity_boot%s.rds', n_boot))
 }
 
-################################################################################
-# AGGREGATION
-################################################################################
-# normalize for each region
-region_sim_norm <- region_output %>%
-  group_by(worldbank_region) %>%
-  mutate(norm_sim = scale(region_similarity))
-
-# make a global reference
-global_ref <- region_sim_norm %>%
-  group_by(boot, date) %>%
-  reframe(norm_sim = mean(norm_sim)) %>%
-  cbind(worldbank_region = 'Global')
-
-# join the global reference with regional aggregates
-boot_normalized <- region_sim_norm %>% rbind(global_ref)
-
-# make a aggregated mean by each date and drop if it's an outlier (+- 2SD)
-# these values become the bases for the mean points to plot
-agg_boot <- boot_normalized %>%
-  group_by(worldbank_region, date) %>%
-  reframe(mean_norm_sim = mean(norm_sim)) %>%
-  filter(mean_norm_sim < 2, mean_norm_sim > -2) %>%
-  left_join(WORLDBANK_REGION_COLOUR) # join for colour palette
-
+# Statistical tables use the same staging root as plots and source data.
+statistics_dir <- file.path(Sys.getenv('PLOT_DIR', 'Plots'), 'statistics')
+dir.create(statistics_dir, recursive = TRUE, showWarnings = FALSE)
 
 ################################################################################
-# GAM FITTING
+# AGGREGATION AND GAM FITTING
 ################################################################################
-# for each bootstrap, fit a GAM
-# these become the bases for the gam line and ribbon to fit
-n_spline <- 2
-
-gam_boot <- boot_normalized %>%
-  mutate(date = as.Date(date)) %>%
-  group_by(worldbank_region, boot) %>%
-  reframe(gam_fit(date, norm_sim, n_spline)) %>%
-  ungroup() %>%
-  rename(date = x, norm_sim = y)
-
-gam_boot_agg <- gam_boot %>%
-  group_by(worldbank_region, date) %>%
-  reframe(get_boot_mean_ci(norm_sim, 'sim')) %>%
-  filter(worldbank_region != "Global") %>%
-  left_join(WORLDBANK_REGION_COLOUR) # join for colour palette
+REG_SHORT <- c('East Asia & Pacific' = 'East Asia', 'Europe' = 'Europe', 'Latin America & Caribbean' = 'Latin America',
+               'Middle East & North Africa' = 'Middle East', 'North America' = 'North America', 'Post-Soviet' = 'Post-Soviet')
+rs <- region_output %>%
+  group_by(worldbank_region) %>% mutate(norm_sim = as.numeric(scale(region_similarity))) %>% ungroup()
+pts <- rs %>% group_by(worldbank_region, date) %>% summarise(mean = mean(norm_sim), .groups = 'drop') %>%
+  filter(mean < 2, mean > -2)  # same single-day outlier exclusion as the original script
+gam_fit2 <- function(d) { x <- as.numeric(d$date); m <- gam::gam(norm_sim ~ s(x, 2), data = data.frame(norm_sim = d$norm_sim, x = x))
+  tibble(date = d$date, fit = as.numeric(predict(m))) }
+message('Fitting GAMs (1000 bootstraps x 6 regions)...')
+gb <- rs %>% group_by(worldbank_region, boot) %>% group_modify(~ gam_fit2(.x)) %>% ungroup()
+ga <- gb %>% group_by(worldbank_region, date) %>%
+  summarise(mean = mean(fit), lower_95ci = quantile(fit, .025), upper_95ci = quantile(fit, .975), .groups = 'drop')
+pa <- ggplot(ga, aes(date, mean, colour = worldbank_region, fill = worldbank_region)) +
+  geom_hline(yintercept = 0, colour = 'grey50', linewidth = LW) +
+  geom_point(data = pts %>% filter(worldbank_region == 'Post-Soviet'), size = 1.2, alpha = 0.5, shape = 16) +
+  geom_ribbon(aes(ymin = lower_95ci, ymax = upper_95ci), colour = NA, alpha = 0.25) +
+  geom_line(linewidth = 0.4) +
+  geom_vline(xintercept = WAR_START, linetype = 'dashed', linewidth = LW) +
+  scale_colour_manual(values = REGION_COLS, labels = REG_SHORT, name = NULL) +
+  scale_fill_manual(values = REGION_COLS, guide = 'none') +
+  scale_x_date(date_breaks = '1 month', date_labels = '%b %Y', expand = expansion(mult = 0.01)) +
+  labs(x = NULL, y = 'Discovery similarity\nacross countries (z)') + theme(legend.position = 'none')
+plot_save('Fig5/a_similarity_over_time', c(100, 55),
+           ga %>% rename(region = worldbank_region) %>% left_join(pts %>% rename(region = worldbank_region, daily_mean_postsoviet = mean), by = c('region','date')), pa)
 
 
 ################################################################################
-# TRENDS
+# RAW-SCALE SLOPES AND POST-MINUS-PRE SLOPE CHANGES
 ################################################################################
-# plot temporal trend change of Post-Soviet in comparison to the global average
-(
-  gam_change_plot <- gam_boot_agg %>%
-    ggplot(
-      aes(
-        as.Date(date),
-        sim_m,
-        group = worldbank_region,
-        colour = region_colour,
-        fill = region_colour
-      )
-    ) +
-    geom_hline(yintercept = 0, colour = 'gray50') +
-    
-    # plot the mean GAM line with ribbon as CI
-    geom_line(alpha = 1) +
-    geom_ribbon(
-      aes(ymin = sim_lower_ci, ymax = sim_upper_ci),
-      alpha = 0.3,
-      size = 0
-    ) +
-    
-    # add the raw points for post-Soviet
-    geom_point(
-      data = agg_boot %>% filter(worldbank_region == 'Post-Soviet'),
-      aes(as.Date(date), mean_norm_sim),
-      size = 1,
-      alpha = 0.5
-    ) +
-    
-    # add baseline 0 (no change) as reference and war onset date
-    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month", 
-                 limits = c(min(as.Date(agg_boot$date)), max(as.Date(agg_boot$date)) + 7)) +
-    geom_vline(xintercept = WAR_START, linetype = 'dashed') +
-    labs(y = 'Discovery similarity\nacross countries', x = '', fill = 'World Region') +
-    scale_colour_identity() +
-    scale_fill_identity() +
-    theme(legend.position = 'none')
-)
-
-# save plot for main figure
-plot_save('Main/within_region_discovery_similarity_over_time', c(130, 80))
-
-# Report simple linear time trends on the raw similarity scale
-decline_trend <- region_output %>%
-  filter(worldbank_region == 'Post-Soviet') %>%
-  mutate(
-    date = as.Date(date),
-    date_num = as.numeric(date),
-    period = ifelse(date < WAR_START, 'pre', 'post')
-  )
-
-decline_lm <- decline_trend %>%
-  group_by(boot, period) %>%
-  group_modify(~ {
-    fit <- lm(region_similarity ~ date_num, data = .x)
-    tibble(
-      n_days = nrow(.x),
-      slope = unname(coef(fit)[['date_num']])
-    )
-  }) %>%
-  ungroup()
-
-decline_lm_agg <- decline_lm %>%
-  group_by(period) %>%
-  reframe(
-    n_boot = n(),
-    get_boot_mean_ci(slope, 'slope', obs_stat = 0, p_parametric = FALSE)
-  )
-
-# report stats
-decline_lm_agg
-
+period_data <- region_output %>% ungroup() %>%
+  mutate(date = as.Date(date), period = ifelse(date < WAR_START, 'pre', 'post'), x = as.numeric(date))
+slopes <- period_data %>% group_by(worldbank_region, period, boot) %>%
+  summarise(n_days = n(), slope = unname(coef(lm(region_similarity ~ x))[2]), .groups = 'drop')
+write_csv(slopes %>% group_by(worldbank_region, period) %>% reframe(boot_test(slope)), file.path(statistics_dir, 'similarity_slopes.csv'))
+slope_change <- slopes %>% select(-n_days) %>% pivot_wider(names_from = period, values_from = slope) %>%
+  group_by(worldbank_region) %>% reframe(boot_test(post - pre))
+write_csv(slope_change, file.path(statistics_dir, 'similarity_slope_change.csv'))
 
 ################################################################################
-# EFFECT SIZE OF CHANGE
+# EFFECT SIZE OF CHANGE AND BETWEEN-REGION BOOTSTRAP CONTRASTS
 ################################################################################
-# plot the effect size (Cohen's d) for pre post change relative to global mean
-region_effect <- region_sim_norm %>%
-  mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post')) %>%
-  select(-date)
-
-# do t-test using the pre and post values for each boot strapped samples
-region_change_effect <- region_effect %>%
-  pivot_wider(names_from = pre_post, values_from = region_similarity) %>%
-  group_by(boot, worldbank_region) %>%
-  summarise(get_t_stat(post %>% unlist(), pre %>% unlist())) %>%
-  ungroup()
-  
-# aggregate across bootstraps
-region_change_effect_agg <- region_change_effect %>% 
-  group_by(worldbank_region) %>%
-  reframe(get_boot_mean_ci(cohensD, 'd')) %>%
-  left_join(WORLDBANK_REGION_COLOUR) # join for colour palette
-
-region_change_effect_agg <- region_change_effect_agg %>%
-  mutate(worldbank_region = str_replace_all(worldbank_region, ' & ', ' &\n'))
-
-# plot effect differences
-(region_change_effect_plot <- region_change_effect_agg %>%
-    ggplot(aes(
-      reorder(worldbank_region,- d_m),
-      d_m,
-      group = worldbank_region,
-      colour = region_colour
-    )) +
-    geom_hline(yintercept = 0, colour = 'gray50') +
-    # geom_bar(stat = 'identity') +
-    geom_pointrange(aes(ymin = d_lower_ci, ymax = d_upper_ci)) +
-    coord_flip() +
-    ylim(-2.6, 0.8) +
-    labs(y = "Pre vs. Post change\n(Cohen's d)", x = '') +
-    scale_color_identity() +
-    theme(legend.position = 'none')
-)
-
-# report statistics of effect size in text
-region_change_effect_agg %>%
-  arrange(d_m)
-
-# save plot for main figure
-plot_save('Main/within_region_discovery_similarity_effect_size', c(100, 80))
-
-# make binded plot
-gam_change_plot + region_change_effect_plot + plot_layout(widths = c(2.5, 1))
-plot_save('Main/within_region_discovery_similarity_bind', c(183, 60))
-
+# Cohen's d uses the pooled daily SD, post minus pre, within each saved draw.
+region_effect <- period_data %>% group_by(worldbank_region, boot) %>%
+  summarise(welch(region_similarity[period == 'post'], region_similarity[period == 'pre']), .groups = 'drop')
+d <- region_effect %>% group_by(worldbank_region) %>% reframe(boot_test(d)) %>%
+  mutate(region = REG_SHORT[worldbank_region])
+write_csv(d, file.path(statistics_dir, 'similarity_d.csv'))
+effect_wide <- region_effect %>% select(worldbank_region, boot, d) %>% pivot_wider(names_from = worldbank_region, values_from = d)
+region_contrasts <- map_dfr(setdiff(names(effect_wide), c('boot', 'Post-Soviet')), function(other) {
+  boot_test(effect_wide$`Post-Soviet` - effect_wide[[other]]) %>% mutate(vs = other)
+})
+write_csv(region_contrasts, file.path(statistics_dir, 'postsoviet_vs_regions_d.csv'))
+pb <- ggplot(d, aes(est, reorder(region, -est), colour = worldbank_region)) +
+  geom_vline(xintercept = 0, colour = 'grey50', linewidth = LW) +
+  geom_pointrange(aes(xmin = lo, xmax = hi), size = 0.5, linewidth = 0.4) +  # default fatten = 4 doubles the previous mean dot
+  scale_colour_manual(values = REGION_COLS, guide = 'none') +
+  labs(x = "Pre vs. Post change\n(Cohen's d)", y = NULL)
+plot_save('Fig5/b_similarity_effect_size', c(55, 55),
+           d %>% select(region = worldbank_region, cohens_d = est, lower_95ci = lo, upper_95ci = hi, z, p = p_z), pb)

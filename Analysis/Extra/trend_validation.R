@@ -3,7 +3,6 @@
 
 # load study-wide functions and global variables
 source('utils.R')
-require(psych) # for correlation test
 
 # load bootstrapped trend data
 local_trend_boot <- read_rds('Bootstraps/trend_lyrics_lang_boot1000.rds')
@@ -49,16 +48,22 @@ back_to_pre <- after_one_month %>%
 
 # for each bootstrap, count the days from invasion reach back to the pre-mean
 back_to_pre <- back_to_pre %>%
+  arrange(country_code, boot, date) %>%
   group_by(country_code, boot) %>%
-  mutate(day_since = 30:(n() + 29),
-         is_over_pre = ifelse(m_prop >= pre_m_prop, TRUE, FALSE)) %>%
-  filter(is_over_pre) %>%
-  slice(1)
+  summarise(day_since = {
+    first_return <- which(m_prop >= pre_m_prop)[1]
+    if (is.na(first_return)) NA_real_ else as.numeric(as.Date(date[first_return]) - WAR_START)
+  }, .groups = 'drop')
 
 # report the days to pre-invasion baselines
-back_to_pre %>%
+baseline_return_stats <- back_to_pre %>%
   group_by(country_code) %>%
-  reframe(get_boot_mean_ci(day_since, 'day'))
+  summarise(day_m = if (all(is.na(day_since))) NA_real_ else mean(day_since, na.rm = TRUE),
+            day_lower_ci = unname(quantile(day_since, .025, na.rm = TRUE)),
+            day_upper_ci = unname(quantile(day_since, .975, na.rm = TRUE)),
+            n_returned = sum(!is.na(day_since)), n_never = sum(is.na(day_since)),
+            .groups = 'drop')
+print(baseline_return_stats, width = Inf)
 
 ################################################################################
 # SEASONAL EFFECTS
@@ -76,7 +81,7 @@ ua_seasons <- seasons %>%
   filter(country_code == 'UA', name %in% c('uk', 'ru')) %>%
   group_by(window, name) %>%
   # make fake year for 2023 to align the dates
-  mutate(date = ifelse(window == '2022', date, date - 365))
+  mutate(date = if_else(window == '2022', as.Date(date), as.Date(date) - 365))
 
 ua_seasons <- ua_seasons %>%
   group_by(country_code, window, date, name) %>%
@@ -99,7 +104,7 @@ other_seasons <- seasons %>%
   filter(name == 'ru') %>%
   group_by(window, name) %>%
   # make fake year for 2023 to align the dates
-  mutate(date = ifelse(window == '2022', date, date - 365))
+  mutate(date = if_else(window == '2022', as.Date(date), as.Date(date) - 365))
 
 other_seasons <- other_seasons %>%
   group_by(country_code, window, date, name) %>%
@@ -117,38 +122,46 @@ other_seasons <- other_seasons %>%
     theme(legend.position = 'none'))
 
 # bind the two seasonal trends for SI
-ua_season_plot + other_season_plot + plot_layout(widths = c(1, 4))
-plot_save('SI/seasonal_effects_lyrics_trend', c(183, 50))
+seasonal_plot <- ua_season_plot + other_season_plot + plot_layout(widths = c(1, 4))
+seasonal_source <- bind_rows(ua_seasons %>% filter(name == 'uk') %>% mutate(panel = 'Ukrainian'),
+                             other_seasons %>% mutate(panel = 'Russian'))
+plot_save('SI/seasonal_effects_lyrics_trend', c(180, 50),
+          data = seasonal_source, plot = seasonal_plot)
 
-## Report the correlation stats
-ua_season_cor <- ua_seasons %>%
-  select(window, name, date, boot_m) %>%
-  pivot_wider(names_from = c(name, window), values_from = boot_m)
-
-corr.test(ua_season_cor, use = 'complete.obs', adjust = 'bonferroni')
-
-# russian cor test in other countries
-other_seasons_cor <- other_seasons %>%
-  select(window, country_code, date, boot_m) %>%
-  pivot_wider(names_from = c(country_code, window), values_from = boot_m)
-
-corr.test(other_seasons_cor, use = 'complete.obs', adjust = 'bonferroni')
+# Five reported same-month correlations, not all pairwise correlations (or date).
+# Bonferroni adjustment is across these five tests. Daily values are autocorrelated.
+seasonal_stats <- seasonal_source %>%
+  select(country_code, name, window, date, boot_m) %>%
+  pivot_wider(names_from = window, values_from = boot_m) %>%
+  filter(!is.na(`2022`), !is.na(`2023`)) %>%
+  group_by(country_code, name) %>%
+  group_modify(~ {
+    ct <- cor.test(.x$`2022`, .x$`2023`)
+    tibble(n = nrow(.x), r = unname(ct$estimate), df = unname(ct$parameter),
+           p = ct$p.value, lower_ci = ct$conf.int[1], upper_ci = ct$conf.int[2])
+  }) %>%
+  ungroup() %>% mutate(p_bonf = p.adjust(p, 'bonferroni'))
+print(seasonal_stats, width = Inf)
 
 ################################################################################
 # RANDOM FLUCTUATIONS
 ################################################################################
 # Test for random fluctuations by sampling 6 months randomly and comparing pre and post
 # compare this to the observed difference during invasion period using cohen's d
-lyrics_long <- read_rds('Dataset/chart/longitudinal_postsoviet_chart.rds')
-post_invasion_period <- lyrics_long %>%
-  filter(date > WAR_START + 90) %>%
-  select(date, country_code, language = name, m = mean_boot_value) %>%
-  filter(language %in% c('Ukranian', 'Russian'))
-
-# drop language country pair with too little
-post_invasion_period <- post_invasion_period %>%
-  group_by(country_code, language) %>%
-  filter(n() > 400)
+if (SIMULATION) {
+  # The chart file contains chart appearances, not the daily language summaries.
+  # Use the same saved longitudinal trend estimates as the seasonal analysis.
+  post_invasion_period <- local_trend_boot %>%
+    filter(date > WAR_START + 90, name %in% c('uk', 'ru')) %>%
+    group_by(date, country_code, name) %>%
+    summarise(m = mean(as.numeric(prop)), .groups = 'drop') %>%
+    mutate(language = recode(name, uk = 'Ukranian', ru = 'Russian'),
+           country_code = recode(country_code, UA = 'Ukraine', RU = 'Russia',
+                                 BY = 'Belarus', KZ = 'Kazakhstan')) %>%
+    select(-name) %>%
+    group_by(country_code, language) %>%
+    filter(n() > 400)
+}
 
 # take a random 6 months, split by two and compare the difference with Cohen's d
 n_boot <- 1000
@@ -156,7 +169,7 @@ n_boot <- 1000
 if(SIMULATION){
   fluctutation_store = list()
   for (i in 1:n_boot) {
-    sample_dates <- post_invasion_period$date %>% unique()
+    sample_dates <- post_invasion_period$date %>% unique() %>% sort()
     sample_dates <- sample_dates[1:(length(sample_dates) - 181)]
     
     random_date <- as.Date(sample(sample_dates, 1))
@@ -191,7 +204,7 @@ lyrics_change_effect <- lyrics_lang %>%
   ungroup() %>%
   mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post')) %>%
   select(country_code, name, mean_boot_value, pre_post) %>%
-  pivot_wider(names_from = pre_post, values_from = mean_boot_value) %>%
+  pivot_wider(names_from = pre_post, values_from = mean_boot_value, values_fn = list) %>%
   group_by(country_code, name) %>%
   filter(length(pre %>% unlist()) > 80)
 
@@ -232,11 +245,31 @@ make_comparison_plot <- function(country, lang){
 (other_random_flux <- make_comparison_plot(c('Ukraine', 'Russia', 'Belarus', 'Kazakhstan'), c('Russian')))
 
 # bind the random flux plots and save as SI figure
-ukraine_random_flux + other_random_flux + plot_layout(widths = c(1, 4))
-plot_save('SI/random_fluctuations_lyrcs_trend', c(183, 50))
+random_plot <- ukraine_random_flux + other_random_flux + plot_layout(widths = c(1, 4))
+random_reference <- lyrics_change_effect %>% rename(language = name) %>%
+  semi_join(fluctuation_output %>% distinct(country_code, language),
+            by = c('country_code', 'language'))
+random_source <- bind_rows(
+  fluctuation_output %>% mutate(series = 'random window'),
+  fluctuation_output %>% group_by(country_code, language) %>%
+    reframe(get_boot_mean_ci(cohensD, 'cohen')) %>% mutate(series = 'random summary'),
+  random_reference %>% mutate(series = 'observed'))
+plot_save('SI/random_fluctuations_lyrcs_trend', c(180, 50),
+          data = random_source, plot = random_plot)
 
-# report p-stat by comparing the observed effect against the bootstrap distribution
-fluctuation_output %>%
-  left_join(lyrics_change_effect %>% select(country_code, language = name, observed_d = cohensD)) %>%
+# Compare observed d with saved random-window draws, not a Gaussian z test.
+# Report raw empirical tail proportions and finite-simulation corrected P values;
+# zero exceedances in 1,000 draws are not evidence for P = 0.
+random_window_stats <- fluctuation_output %>%
+  inner_join(lyrics_change_effect %>% select(country_code, language = name, observed_d = cohensD),
+             by = c('country_code', 'language')) %>%
   group_by(country_code, language) %>%
-  reframe(get_boot_mean_ci(cohensD, 'm', obs_stat = observed_d[1], p_parametric = FALSE))
+  summarise(observed_d = first(observed_d), n_null = n(),
+            null_mean = mean(cohensD), null_lower_ci = quantile(cohensD, .025),
+            null_upper_ci = quantile(cohensD, .975),
+            n_lower = sum(cohensD <= first(observed_d)),
+            n_upper = sum(cohensD >= first(observed_d)), .groups = 'drop') %>%
+  mutate(p_two_empirical = pmin(1, 2 * pmin(n_lower, n_upper) / n_null),
+         p_two = pmin(1, 2 * (1 + pmin(n_lower, n_upper)) / (1 + n_null)),
+         p_one = (1 + if_else(observed_d < 0, n_lower, n_upper)) / (1 + n_null))
+print(random_window_stats, width = Inf)

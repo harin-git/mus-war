@@ -106,6 +106,8 @@ theme_pub <- function(base = BASE) {
     )
 }
 theme_set(theme_pub())
+# let the default pdf device (e.g. Rscript's Rplots.pdf) draw 'Arial' as Helvetica
+if (!'Arial' %in% names(grDevices::pdfFonts())) grDevices::pdfFonts(Arial = grDevices::pdfFonts()$Helvetica)
 
 # facet strips as boxes (theme_classic default weight), used for the faceted trend plots
 strip_box <- theme(strip.background = element_rect(fill = 'white', colour = 'black', linewidth = rel(2)),
@@ -229,14 +231,16 @@ get_t_stat <- function(group1, group2){
 
 # for bootstrap confidence estimates: mean, 95% percentile CI, bootstrap z and two-tailed P
 # (z = (mean - null) / bootstrap SD, P from the standard normal; p_perc = two-tailed percentile P)
-get_boot_mean_ci <- function(x, var_name, obs_stat = 0, alpha = 0.05, ...){
+get_boot_mean_ci <- function(x, var_name, obs_stat = 0, alpha = 0.05, p_parametric = TRUE, ...){
+  # Saved language proportions can carry class 'table'; intervals must be plain numeric.
+  x <- as.numeric(x)
   x <- x[is.finite(x)]
   z <- (mean(x) - obs_stat) / sd(x)
   output <- tibble(m = mean(x),
                    lower_ci = unname(quantile(x, alpha / 2)),
                    upper_ci = unname(quantile(x, 1 - alpha / 2)),
                    z = z,
-                   p = 2 * pnorm(-abs(z)),
+                   p = if (p_parametric) 2 * pnorm(-abs(z)) else min(1, 2 * min(mean(x <= obs_stat), mean(x >= obs_stat))),
                    p_perc = min(1, 2 * min(mean(x <= obs_stat), mean(x >= obs_stat))))
   colnames(output) <- paste(var_name, colnames(output), sep = '_')
   return(output)
@@ -244,6 +248,33 @@ get_boot_mean_ci <- function(x, var_name, obs_stat = 0, alpha = 0.05, ...){
 
 # report a P value as in the paper (three decimals, < 0.001 below)
 fmt_p <- function(p) ifelse(p < 0.001, 'P < 0.001', sprintf('P = %.3f', p))
+
+# Bootstrap diagnostics and Welch summaries shared by the analysis scripts.
+boot_test <- function(x, null = 0) {
+  x <- x[is.finite(x)]
+  B <- length(x)
+  est <- mean(x); se <- sd(x)
+  z <- (est - null) / se
+  p_z <- 2 * pnorm(-abs(z))
+  p_perc <- min(1, 2 * min(mean(x <= null), mean(x >= null)))
+  sw <- if (B >= 3 && B <= 5000 && se > 0) shapiro.test(x)$p.value else NA_real_
+  tibble(B, est, lo = unname(quantile(x, 0.025)), hi = unname(quantile(x, 0.975)),
+         se, z, p_z, p_perc, shapiro_p = sw)
+}
+
+# Welch t-test + Cohen's d (pooled SD, as in utils.R get_t_stat) with df
+welch <- function(g1, g2) {
+  g1 <- g1[!is.na(g1)]; g2 <- g2[!is.na(g2)]
+  if (length(g1) < 2 || length(g2) < 2 || (var(g1) == 0 && var(g2) == 0))
+    return(tibble(t = NA_real_, df = NA_real_, p = NA_real_, d = NA_real_,
+                  n1 = length(g1), n2 = length(g2)))
+  tt <- t.test(g1, g2)
+  n1 <- length(g1); n2 <- length(g2)
+  sp <- sqrt(((n1 - 1) * var(g1) + (n2 - 1) * var(g2)) / (n1 + n2 - 2))
+  tibble(t = unname(tt$statistic), df = unname(tt$parameter), p = tt$p.value,
+         d = (mean(g1) - mean(g2)) / sp, n1, n2)
+}
+
 
 # for standard error
 SE <- function(x){
@@ -505,14 +536,14 @@ get_edges_within_regions = function(all_regions, pre_network, post_network){
 # Save the last (or given) plot at its printed size in mm: editable SVG, a PDF made from the SVG (for linked
 # placement in Illustrator), a 300-dpi PNG, and the plotted data as a source-data CSV when `data` is given.
 # Output goes to Plots/ (or the PLOT_DIR environment variable).
-plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last_plot()){
+plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last_plot(), pdf = TRUE){
   root <- Sys.getenv('PLOT_DIR', 'Plots')
   f <- file.path(root, plot_name)
   dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
   message(sprintf('saving plot to: %s', f))
   svglite::svglite(paste0(f, '.svg'), width = size[1] / 25.4, height = size[2] / 25.4, fix_text_size = FALSE)
   print(plot); invisible(dev.off())
-  rsvg::rsvg_pdf(paste0(f, '.svg'), paste0(f, '.pdf'))
+  if (pdf) rsvg::rsvg_pdf(paste0(f, '.svg'), paste0(f, '.pdf'))
   ggsave(paste0(f, '.png'), plot, width = size[1], height = size[2], units = 'mm', dpi = 300, bg = 'white')
   if(!is.null(data)){
     sd <- file.path(root, 'source_data'); dir.create(sd, showWarnings = FALSE)

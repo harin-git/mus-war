@@ -4,7 +4,7 @@
 source('utils.R')
 
 # Read the city metadata
-city_data <- read_csv('Dataset/meta/city_metadata.csv')
+city_data <- read_rds('Dataset/meta/city_metadata.rds')
 
 # load songs data
 d <- readRDS('Dataset/chart/study_set_chart.rds')
@@ -13,47 +13,15 @@ d_sub <- d %>%
     filter(country_code %in% SUB_COUNTRIES) %>%
     as_tibble()
 
-# get metadata
-song_meta <- readRDS('Dataset/meta/song_metadata.rds') %>% as_tibble()
-ua_songs <- song_meta %>% filter(lyrics_language == 'uk') %>% select(trackID, title, artist)
+# example song: Stefania (Kalush Orchestra). Day on which each city first had it in the top 50
+sample_song <- '603183336'
+song_spread_smp <- d_sub %>%
+    filter(trackID == sample_song) %>%
+    group_by(nodeID, city_name) %>%
+    summarise(appear_date = min(date), .groups = 'drop') %>%
+    mutate(day_since = as.numeric(appear_date - min(appear_date))) %>%
+    left_join(city_data %>% select(nodeID, lat, lon), by = 'nodeID')
 
-# get a song from Ukraine that spreads 
-d_sub_sub <- d_sub %>%
-    filter(trackID %in% ua_songs$trackID)
-
-# get the song that spreads the most
-song_spread <- d_sub_sub %>%
-    group_by(trackID, city_name, nodeID) %>%
-    summarise(appear_date = min(date)) %>%
-    group_by(trackID) %>%
-    mutate(day_since = as.numeric(appear_date - min(appear_date)))
-
-# add lat and lon
-song_spread <- song_spread %>%
-    left_join(city_data %>% select(nodeID, lon, lat, worldbank_region))
-
-# sample one song
-sample_song <- '603183336' # Stefania (Kalush Orchestra)
-song_spread_smp <- song_spread %>%
-    filter(trackID == sample_song)
-
-# make three datasets 
-song_spread_0 <- song_spread_smp %>%
-    filter(day_since == 0) %>% 
-    cbind(day_group = 'day_0')
-
-song_spread_10 <- song_spread_smp %>%
-    filter(day_since <= 10) %>% 
-    cbind(day_group = 'day_10')
-
-song_spread_30 <- song_spread_smp %>%
-    filter(day_since <= 30) %>% 
-    cbind(day_group = 'day_30')
-
-# combine
-song_spread_all <- rbind(song_spread_0, song_spread_10, song_spread_30)
-
-# get city metadata
 # Load additional packages for mapping
 library(maps)
 library(mapdata)
@@ -61,39 +29,35 @@ library(mapdata)
 # Get world map data
 world_map <- map_data("world")
 
-make_spread_map <- function(dt) {
-    ggplot() +
-    # Add world map outline (cropped to region)
-    geom_polygon(data = world_map, 
-                aes(x = long, y = lat, group = group),
-                fill = "grey95", 
-                color = "grey50", 
-                linewidth = 0.3) +
-    # add density distribution as raster smooth map
-    stat_density_2d(data = dt, 
-                aes(x = lon, y = lat, fill = after_stat(density)), 
-                geom = "raster", 
-                contour = FALSE,
-                alpha = 0.5) +
-    scale_fill_gradient(low = "white", high = "#FFA500", guide = "none") +
-    # Add Post-Soviet city points
-    geom_point(data = dt, 
-                aes(x = lon, y = lat, color = worldbank_region),
-                size = 2, 
-                alpha = 1,
-                colour = 'black',
-                shape = 3) +
-    theme_map() +
-    coord_fixed(1.3, xlim = c(20, 90), ylim = c(40, 70))
+# density surface over the full map extent (same default bandwidth as stat_density_2d)
+grid_kde <- function(dt, n = raster_n(FULL_W / 3)) {
+    if (nrow(dt) < 3) dt <- bind_rows(dt, dt %>% mutate(lon = lon + 0.5), dt %>% mutate(lat = lat + 0.5))  # day 0 has one city
+    h <- c(MASS::bandwidth.nrd(dt$lon), MASS::bandwidth.nrd(dt$lat))
+    k <- MASS::kde2d(dt$lon, dt$lat, h = h, n = n, lims = c(20, 90, 40, 70))
+    tibble(expand.grid(lon = k$x, lat = k$y), density = as.vector(k$z))
 }
 
+make_spread_map <- function(day) {
+    dt <- song_spread_smp %>% filter(day_since <= day)
+    g <- grid_kde(dt)
+    ggplot() +
+    # Add world map outline (cropped to region)
+    geom_polygon(data = world_map, aes(x = long, y = lat, group = group),
+                 fill = "grey95", color = "grey50", linewidth = LW_MIN) +
+    # add density distribution as raster smooth map
+    raster_layer(g %>% mutate(density = density / max(density)), 'lon', 'lat', 'density', '#FFA50000', '#FFA50080', limits = c(0, 1)) +
+    # cities where the song has appeared
+    geom_point(data = dt, aes(x = lon, y = lat), shape = 3, size = 0.8, stroke = 0.3, colour = 'black') +
+    coord_fixed(1.3, xlim = c(20, 90), ylim = c(40, 70), expand = FALSE) +
+    scale_x_continuous(breaks = seq(30, 90, 20), labels = lon_lab) +
+    scale_y_continuous(breaks = seq(40, 70, 10), labels = lat_lab) +
+    labs(title = sprintf('Day %s', day)) +
+    theme_map_axes() +
+    theme(plot.title = element_text(hjust = 0.5), plot.margin = margin(1, 3, 1, 1, 'mm'))
+}
 
-day_0_map <- make_spread_map(song_spread_0)
-day_10_map <- make_spread_map(song_spread_10)
-day_30_map <- make_spread_map(song_spread_30)
-
-day_0_map + day_10_map + day_30_map
-
-# save the plot
-plot_save('Main/song_spread_example', c(500, 80))
-
+# Fig. 1c: day 0, 10 and 30
+spread_plot <- make_spread_map(0) + make_spread_map(10) + make_spread_map(30)
+plot_save('Main/song_spread_example', c(FULL_W, 38),
+          song_spread_smp %>% select(nodeID, city_name, lat, lon, first_date = appear_date, day_since),
+          spread_plot)

@@ -1,125 +1,75 @@
-#' Acoustic analyses on genre and music features 
-#' Related to Fig. 3 in paper
+#' Change in individual acoustic features of local songs (Ukrainian songs in Ukraine, Russian songs in Russia)
+#' from pre- to post-invasion. Reported as statistics only (Methods and Supplementary Information).
+#' Related to Fig. 3 in paper (acoustic analysis)
 
 # load study-wide functions and global variables
 source('utils.R')
-
+library(BayesFactor) # Bayes factors for the null results
 
 ################################################################################
 # PREPARATION
 ################################################################################
-SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
+# one row per song; a song's period is the period of its first chart appearance in Ukraine or Russia
+chart_data <- read_rds('Dataset/chart/study_set_chart.rds') %>% filter(country_code %in% c('UA', 'RU'))
+first_period <- chart_data %>%
+  group_by(trackID) %>% arrange(date) %>% slice(1) %>% ungroup() %>%
+  transmute(trackID, pre_post = ifelse(date < WAR_START, 'pre', 'post'))
 
-# load data
-chart_data <- read_rds('Dataset/chart/study_set_chart.rds')
-song_meta <- read_rds('Dataset/meta/song_metadata.rds')
-acoustic_data <- song_meta %>% 
-  select(trackID, genres, lyrics_language, 
+# acoustic features, z-scored across all songs
+acoustic_data <- read_rds('Dataset/meta/song_metadata.rds') %>%
+  select(trackID, lyrics_language,
          loudness,
          dynamics = dynamic_complexity,
          richness = spectral_complexity,
-         brightness = spectral_centroid, 
-         'chord change' = chord_change_rate,
-         'zero crossing' = zcr,
+         brightness = spectral_centroid,
+         `chord change` = chord_change_rate,
+         `zero crossing` = zcr,
          mode = major_minor,
          tempo = bpm) %>%
   group_by(trackID) %>%
   slice(1) %>%
   ungroup() %>%
-  # scale each of the features
-  mutate(across(loudness:tempo, scale))
+  mutate(across(loudness:tempo, ~ as.numeric(scale(.x))))
 
-# sub ukraine and russia and songs
-ua_ru <- chart_data %>%
-  filter(country_code %in% c('UA', 'RU'))
+# local songs discovered in each country, each song once
+local_songs <- chart_data %>%
+  distinct(country_code, trackID) %>%
+  left_join(first_period, by = 'trackID') %>%
+  left_join(acoustic_data, by = 'trackID') %>%
+  filter((country_code == 'UA' & lyrics_language == 'uk') | (country_code == 'RU' & lyrics_language == 'ru')) %>%
+  pivot_longer(loudness:tempo, names_to = 'feature') %>%
+  filter(!is.na(value))
 
-# make a dict classifying songs as pre or post invasion
-pre_post_songs <- ua_ru %>%
-  group_by(trackID) %>%
-  arrange(date) %>%
-  slice(1) %>%
-  ungroup() %>%
-  mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post')) %>%
-  select(trackID, pre_post)
-
-# join the chart data with pre and post songs
-ua_joined <- ua_ru %>% select(-pre_post) %>% left_join(pre_post_songs)
-
-# join the acoustic features and filter only the local music
-acoustic_joined <- ua_joined %>% left_join(acoustic_data)
-acoustic_joined <- acoustic_joined %>%
-  filter((country_code == 'RU' & lyrics_language == 'ru') | (country_code == 'UA' & lyrics_language == 'uk'))
+# number of songs per country and period
+local_songs %>% distinct(country_code, pre_post, trackID) %>% count(country_code, pre_post)
 
 
 ################################################################################
-# CHANGE IN MUSIC FEATURES
+# BOOTSTRAP (songs resampled within country, period and feature)
 ################################################################################
-# compare the pre and post differences in high-level dimensions of music
-acoustic_feat <- acoustic_joined %>%
-  select(trackID, country_code, pre_post, loudness:tempo, lyrics_language) %>%
-  pivot_longer(loudness:tempo) %>%
-  na.omit()
-
-# bootstrap across the songs
 n_boot <- 1000
+set.seed(1)
+feature_boot <- map_dfr(1:n_boot, function(b)
+  local_songs %>%
+    group_by(country_code, pre_post, feature) %>%
+    summarise(m = mean(sample(value, n(), replace = TRUE)), .groups = 'drop') %>%
+    mutate(boot = b))
 
-if(SIMULATION){
-  acoustic_store = list()
-  for (i in 1:n_boot) {
-    smp <- acoustic_feat %>%
-      group_by(country_code, pre_post) %>%
-      sample_n(n(), replace = T)
-    
-    # calculate effect size of change
-    effect <- smp %>%
-      select(country_code, pre_post, name, value) %>%
-      pivot_wider(names_from = pre_post, values_from = value) %>%
-      group_by(country_code, name) %>%
-      reframe(get_t_stat(post %>% unlist(), pre %>% unlist()))
-    
-    effect <- effect %>%
-      select(country_code, name, cohensD, change = mean_diff) %>%
-      mutate(boot = i)
-    
-    # store everything
-    acoustic_store[[i]] <- smp %>%
-      group_by(country_code, pre_post, name) %>%
-      reframe(m = mean(value)) %>%
-      arrange(country_code) %>%
-      mutate(boot = i) %>%
-      left_join(effect)
-    
-    print(i)
-  }
-  acoustic_store_output <- do.call(rbind, acoustic_store)
-  acoustic_store_output %>% write_rds(sprintf('Bootstraps/acoustic_feat_boot%s.rds', n_boot))  
-} else {
-  boot_load()
-  acoustic_store_output <- read_rds(sprintf('Bootstraps/acoustic_feat_boot%s.rds', n_boot))
-}
+# change (post - pre) in z-scored units: bootstrap mean, 95% CI, z and P, Bonferroni-corrected over 16 tests
+feature_change <- feature_boot %>%
+  pivot_wider(names_from = pre_post, values_from = m) %>%
+  mutate(change = post - pre) %>%
+  group_by(country_code, feature) %>%
+  reframe(get_boot_mean_ci(change, 'change')) %>%
+  mutate(change_p_bonferroni = p.adjust(change_p, method = 'bonferroni'))
 
-# get acoustic differences
-acoustic_diff <- acoustic_store_output %>%
-  group_by(country_code, name) %>%
-  reframe(get_boot_mean_ci(change, 'change'))
+# Bayes factors (BF01, evidence for no change; default JZS prior) for each comparison
+feature_bf <- local_songs %>%
+  group_by(country_code, feature) %>%
+  group_modify(~ tibble(BF01 = 1 / exp(ttestBF(.x$value[.x$pre_post == 'post'], .x$value[.x$pre_post == 'pre'])@bayesFactor$bf))) %>%
+  ungroup()
 
-# report stats in the paper
-acoustic_diff
-
-# save plots for main figure
-acoustic_diff %>%
-  mutate(country_code = factor(country_code, levels = c('UA', 'RU'), labels = c('Ukraine', 'Russia'))) %>%
-  ggplot(aes(reorder(name, change_m), change_m, 
-             ymin = change_lower_ci, ymax = change_upper_ci,
-             colour = country_code)) +
-  geom_pointrange() +
-  facet_wrap(~ country_code) +
-  geom_hline(yintercept = 0) +
-  scale_colour_manual(values = c(UKRAINE_COLOUR, RUSSIAN_COLOUR)) +
-  coord_flip() +
-  labs(x = '', y = 'Pre vs. Post difference (z-score)') +
-  scale_y_continuous(breaks = c(-0.5, 0, 0.5)) +
-  theme(legend.position = 'none')
-
-plot_save('Main/acoustic_feature_analyses', c(90, 50))
-
+feature_change %>%
+  left_join(feature_bf, by = c('country_code', 'feature')) %>%
+  arrange(country_code, change_p) %>%
+  print(n = Inf, width = Inf)

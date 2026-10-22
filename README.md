@@ -18,17 +18,27 @@ You can also download the data using the helper function `download_data.R`, whic
 
 ## Reproducing the analyses and plots
 
-All analyses in the paper can be reproduced with the code posted here, in R and Python. Most of our computations are done using bootstrap simulations, which are often computationally costly. Therefore, pre-computed bootstrap files are available for downloaded by specifying `bootstrap_files = TRUE` using `download_data.R` . This will initiate in creating a directory called `/Boostraps` and download the bootstrap files.
+All analyses in the paper can be reproduced with the code posted here, in R and Python. Most computations use bootstrap simulations, which can be computationally costly. Pre-computed bootstrap files can be downloaded by calling `download_data(bootstrapped_data = TRUE)` in `download_data.R`. They belong in the `Bootstraps/` directory.
 
 Scripts to reproduce the statistics and plots of the main results are contained in the directory `/Analysis`, while secondary scripts for validation, extracting embeddings, etc are included in sub-directory `/Analysis/Extra`
 
 When running all analyses and reproducing the figures, `SIMULATION` parameter in the scripts can be set to `FALSE` to bypass the bootstrap computation. Given the bootstrap data is downloaded, it will fetch the pre-computed bootstrap outcomes.
 
-All analyses scripts begin by loading study-wide packages and high level functions through `utils.R`. These packages included in the script needs to be first installed to fully reproduce all analyses. See file `session_info.txt` for full specification used by the researcher.
+All analysis scripts begin by loading study-wide packages and high-level functions through `utils.R`. Install the packages used by the relevant scripts before running them. See `session_info.txt` for the original analysis environment.
 
-All visualizations are produced using `ggplot2`, with the exception of diffusion networks, which was visualized using [Gephi](https://gephi.org/). Some figure elements are augmented manually (e.g., adding some labels) and/or include illustrations.
+### Figure exports
 
-To infer the diffusion network, [NETINF](https://snap.stanford.edu/netinf/) needs to be installed. Once installed and pointed to the right path, `Main1d,e-infer_diffusion_network.R` function can be used as a wrapper to augment the raw data and format the cascades as input to NETINF.
+Run each `Analysis/Main…` script from the repository root with `Dataset/` and `Bootstraps/` available. Each script contains its analysis and one plotting/export path. The shared settings, statistical summaries and `plot_save()` are in `utils.R`.
+
+`plot_save()` writes an editable SVG, a PDF generated from that SVG, a 300-dpi PNG and the plotted data as a CSV. Outputs go to `Plots/Main/`, `Plots/SI/` and `Plots/source_data/`; set `PLOT_DIR` to use another directory. Statistical results are printed by the relevant analysis script. `Main3d-acoustic_features.R` reports the 16 song-level feature comparisons with Bonferroni correction and Bayes factors, without producing a figure.
+
+Plotting packages include `svglite`, `rsvg`, `sf`, `maps`, `uwot`, `quanteda`, `ggwordcloud`, `philentropy`, `MASS` and `patchwork`. `BayesFactor` is used for evidence about null results. UMAP coordinates and word clouds use fixed seeds; UMAP uses one thread. Saved bootstrap inputs must match the current data and code. In particular, the acoustic JSD bootstrap uses kernel width 1 and UMAP seed 42.
+
+`Dataset/`, `Bootstraps/`, `out/`, `Plots/` and `logs/` are local inputs/outputs excluded from git. Running the scripts does not upload them. Editorial diagnostics and working audit scripts are not part of this repository.
+
+All visualisations are produced using `ggplot2`, except the diffusion networks in Fig. 5c,d, which are exported separately from [Gephi](https://gephi.org/). Manual figure assembly, illustrations and labels added outside R are not recreated by the runner.
+
+To infer the diffusion network, [NETINF](https://snap.stanford.edu/netinf/) needs to be installed. Once installed and pointed to the right path, `Main5c,d-infer_diffusion_network.R` function can be used as a wrapper to augment the raw data and format the cascades as input to NETINF.
 
 ## Codebook
 

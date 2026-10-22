@@ -4,7 +4,7 @@
 
 source('utils.R')
 
-SIMULATION <- TRUE
+SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
 
 ################################################################################
 # DATA PREPARATION
@@ -65,103 +65,68 @@ if(SIMULATION){
   boot_output <- read_rds(sprintf('Bootstraps/trend_lyrics_lang_replication_boot%s.rds', n_boot))
 }
 
-# aggregate the outcome
-boot_agg <- boot_output %>%
-    group_by(platform, date, country_code, name) %>%
-    reframe(get_boot_mean_ci(prop, 'boot'))
-
-# organise the outcome
-chart_plot <- boot_agg %>%
-    mutate(name = factor(name, levels = c('Ukrainian', 'Russian', 'Kazakh', 'English', 'Other')),
-           country_code = factor(country_code, levels = c('UA', 'RU'), labels = c('Ukraine', 'Russia')))
+# study window: a language absent from a chart's bootstrap sample has proportion 0 on that date
+boot_window <- boot_output %>%
+  filter(date >= WAR_START - 90, date <= WAR_START + 90) %>%
+  mutate(prop = as.numeric(prop) * 100)
+cells <- boot_window %>% distinct(boot, platform, country_code, date)
+boot_fill <- map_dfr(names(LANG_COLS), function(l)
+  cells %>%
+    left_join(boot_window %>% filter(name == l) %>% select(boot, platform, country_code, date, prop),
+              by = c('boot', 'platform', 'country_code', 'date')) %>%
+    mutate(prop = replace_na(prop, 0), name = l))
 
 ################################################################################
-# TREND PLOT
+# TREND PLOT (Fig. 2b)
 ################################################################################
-# plot the data
-plot_comparison <- function(type){
-    chart_plot %>% 
-    filter(platform == type) %>%
-    # make percentage
-    mutate(percent = boot_m * 100,
-           ci_lower = boot_lower_ci * 100,
-           ci_upper = boot_upper_ci * 100) %>%
-    ggplot(aes(x = date, y = percent, fill = name, color = name)) +
-    geom_line() +
-    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper),  alpha = 0.3, color = NA)  +
-    facet_wrap(~ country_code) +
-    geom_vline(xintercept = WAR_START, linetype = 'dashed', color = 'black') +
-    labs(
-        subtitle = '',
-        x = '', y = 'Proportion (%)', color = 'Language') +
-    scale_color_manual(values = c(
-        'Ukrainian' = UKRAINE_COLOUR,
-        'Russian' = RUSSIAN_COLOUR,
-        'Kazakh' = KAZAKHSTAN_COLOUR,
-        'English' = ENGLISH_COLOUR,
-        'Other' = 'gray'
-    )) +
-    scale_fill_manual(values = c(
-        'Ukrainian' = UKRAINE_COLOUR,
-        'Russian' = RUSSIAN_COLOUR,
-        'Kazakh' = KAZAKHSTAN_COLOUR,
-        'English' = ENGLISH_COLOUR,
-        'Other' = 'gray'
-    )) +
-    theme(plot.title = element_text(hjust = 0))
-}
+chart_plot <- boot_fill %>%
+  group_by(platform, country_code, name, date) %>%
+  summarise(mean = mean(prop), lower_95ci = quantile(prop, .025), upper_95ci = quantile(prop, .975), .groups = 'drop') %>%
+  # keep only language series that occur on a platform and country
+  semi_join(boot_window %>% filter(prop > 0) %>% distinct(platform, country_code, name), by = c('platform', 'country_code', 'name')) %>%
+  mutate(platform = factor(recode(platform, Youtube = 'YouTube Music'), c('YouTube Music', 'Spotify')),
+         country = factor(country_code, c('UA', 'RU'), c('Ukraine', 'Russia')),
+         language = factor(name, names(LANG_COLS)))
 
-# make and save the plot
-yt_plot <- plot_comparison('Youtube')
-sp_plot <- plot_comparison('Spotify')
-
-yt_plot + sp_plot + plot_layout(guides = 'collect') & theme(legend.position = 'none')
-plot_save('Main/comparison_w_spotify_youtube', c(183, 50))
+chart_plot %>%
+  ggplot(aes(date, mean, colour = language, fill = language)) +
+  geom_ribbon(aes(ymin = lower_95ci, ymax = upper_95ci), colour = NA, alpha = 0.3) +
+  geom_line(linewidth = 0.3) +
+  geom_point(size = 0.3, shape = 16) +
+  geom_vline(xintercept = WAR_START, linetype = 'dashed', linewidth = LW) +
+  facet_wrap(~ platform + country, nrow = 1, labeller = labeller(.multi_line = FALSE, .default = function(x) x)) +
+  scale_colour_manual(values = LANG_COLS, name = 'Sung language', drop = FALSE) +
+  scale_fill_manual(values = LANG_COLS, guide = 'none', drop = FALSE) +
+  scale_y_continuous(limits = c(0, 95), breaks = seq(0, 100, 25)) +
+  date_x + labs(x = NULL, y = 'Sung language (%)') +
+  strip_box +
+  theme(legend.position = 'bottom')
+plot_save('Main/comparison_w_spotify_youtube', c(FULL_W, 50),
+          chart_plot %>% select(platform, country, language, date, mean, lower_95ci, upper_95ci))
 
 
 ################################################################################
 # STATS
 ################################################################################
-# compute the pre vs. post increase/decrease percentage. Use cohen's d for effect size measure
-lyrics_change <- chart_plot %>%
-  filter(date >= WAR_START - 90, date <= WAR_START + 90) %>%
+# Pre- vs post-invasion change in Ukrainian and Russian songs on each platform and country.
+# n = weekly charts per period (Spotify Russia ends in April 2022). Cohen's d across charts in each
+# bootstrap replicate, reported as bootstrap mean, 95% CI, z and P.
+lyrics_change <- boot_fill %>%
+  filter(name %in% c('Ukrainian', 'Russian'), !(country_code == 'RU' & name == 'Ukrainian')) %>%
   mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post'))
 
-# Prepare t-stats for Ukraine replication on Spotify and Youtube
-lyrics_change_uk <- lyrics_change %>%
-    filter(country_code == 'Ukraine', name %in% c('Ukrainian', 'Russian')) %>%
-    ungroup()
+# number of charts per period
+lyrics_change %>% filter(boot == 1, name == 'Russian') %>% count(platform, country_code, pre_post)
 
-# get mean and ci
-lyrics_change_uk %>%
-    group_by(platform, name, pre_post) %>%
-    summarise(m = mean(boot_m), ci = CI(boot_m)) %>%
-    mutate(ci_lower = round(m - ci, 2), ci_upper = round(m + ci, 2))
+per_boot <- lyrics_change %>%
+  group_by(platform, country_code, name, boot) %>%
+  summarise(pre = mean(prop[pre_post == 'pre']), post = mean(prop[pre_post == 'post']),
+            get_t_stat(prop[pre_post == 'post'], prop[pre_post == 'pre']), .groups = 'drop')
 
-# get t-stats
-lyrics_change_uk %>%
-    select(platform, name, pre_post, boot_m) %>%
-    pivot_wider(names_from = pre_post, values_from = boot_m) %>%
-    group_by(platform, name) %>%
-    summarise(get_t_stat(post %>% unlist(), pre %>% unlist()))
+# pre and post mean percentage
+per_boot %>% group_by(platform, country_code, name) %>% reframe(get_boot_mean_ci(pre, 'pre'), get_boot_mean_ci(post, 'post')) %>%
+  print(n = Inf, width = Inf)
 
-# Prepare t-stats for Russia replication on Spotify and Youtube
-lyrics_change_ru <- lyrics_change %>%
-    filter(country == 'Russia', lang_category %in% c('Ukrainian', 'Russian')) %>%
-    ungroup()
-
-# get mean and ci
-lyrics_change_ru %>%
-    group_by(platform, lang_category, pre_post) %>%
-    summarise(m = mean(prop), ci = CI(prop)) %>%
-    mutate(ci_lower = round(m - ci, 2), ci_upper = round(m + ci, 2)) %>%
-    view()
-
-# get t-stats
-lyrics_change_ru %>%
-    filter(lang_category == 'Russian', platform == 'Youtube') %>%
-    select(platform, lang_category, pre_post, prop) %>%
-    pivot_wider(names_from = pre_post, values_from = prop) %>%
-    group_by(platform, lang_category) %>%
-    summarise(get_t_stat(post %>% unlist(), pre %>% unlist()))
-
+# effect sizes
+per_boot %>% group_by(platform, country_code, name) %>% reframe(get_boot_mean_ci(cohensD, 'd')) %>%
+  print(n = Inf, width = Inf)

@@ -3,10 +3,12 @@
 .RData
 .Ruserdata
 .DS_Store
-Dataset/*
-Bootstraps/*
+/Dataset
+/Bootstraps
 Animations
-Plots/*
+/Plots
+out/
+logs/
 mus-war-sandbox.Rproj
 csv_rds_converter.R
 interactive/*

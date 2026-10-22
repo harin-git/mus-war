@@ -78,123 +78,119 @@ if(SIMULATION){
   long_boot_output <- read_rds(sprintf('Bootstraps/trend_lyrics_lang_boot%s.rds', n_boot))
 }
 
+# a language absent from a day's bootstrap sample has proportion 0 on that day
+# (this matters for rare series such as Ukrainian songs in Russia and Belarus)
+lang_labels <- c(uk = 'Ukrainian', ru = 'Russian', kk = 'Kazakh', en = 'English', other = 'Other')
+cells <- long_boot_output %>% distinct(boot, country_code, date)
+long_boot_fill <- map_dfr(names(lang_labels), function(l)
+  cells %>%
+    left_join(long_boot_output %>% filter(name == l) %>% select(boot, country_code, date, prop),
+              by = c('boot', 'country_code', 'date')) %>%
+    mutate(name = l, prop = replace_na(as.numeric(prop), 0)))
+# keep only language-country series that occur at all (e.g. no Kazakh in Ukraine)
+long_boot_fill <- long_boot_fill %>% semi_join(long_boot_output %>% distinct(country_code, name), by = c('country_code', 'name'))
+
 # Plotting
-# if study_window is TRUE, 3 months before and after invasion is plotted, else all data is plotted
-long_trend_plot_stat <- function(dt, 
-                                 save_path = c('Main', 'SI'), 
-                                 study_window = TRUE, 
-                                 legend = TRUE){
+# if study_window is TRUE, 3 months before and after invasion is plotted (Fig. 2a), else all data (Supplementary Fig. 1)
+long_trend_plot_stat <- function(dt, save_path = c('Main', 'SI'), study_window = TRUE, legend = TRUE){
   # filter the right data according to the criteria
   if(study_window){
-    ft_data <- dt %>% 
-      filter(date >= as.Date(WAR_START) - 90, date <= as.Date(WAR_START) + 90)
+    ft_data <- dt %>% filter(date >= WAR_START - 90, date <= WAR_START + 90)
   } else {
-    ft_data <- dt %>%
-      filter(date >= as.Date(WAR_START) - 90)
+    ft_data <- dt %>% filter(date >= WAR_START - 90)
   }
-  
-  # aggregate the bootstraps
+
+  # aggregate the bootstraps: mean and 95% percentile CI per day
   message('aggregating bootstraps...')
   agg_data <- ft_data %>%
-    group_by(date, country_code, name) %>% 
-    reframe(get_boot_mean_ci(prop, 'boot'))
-  
-  # reorder the factors
-  agg_data$country_code <- factor(agg_data$country_code, levels = SUB_COUNTRIES, labels = c('Ukraine', 'Russia', 'Belarus', 'Kazakhstan'))
-  agg_data <- agg_data %>%
-    mutate(name = factor(
-      name,
-      levels = c(sub_languages, 'other'),
-      labels = c('Ukranian', 'Russian', 'Kazakh', 'English', 'Other')
-    ))
-  
-  # set theme colour palette
-  colour_pal <- c(UKRAINE_COLOUR, RUSSIAN_COLOUR, KAZAKHSTAN_COLOUR, ENGLISH_COLOUR, 'gray')
-  
+    group_by(date, country_code, name) %>%
+    summarise(percent = mean(prop) * 100,
+              ci_lower = quantile(prop, .025) * 100,
+              ci_upper = quantile(prop, .975) * 100, .groups = 'drop') %>%
+    mutate(country = factor(country_code, levels = SUB_COUNTRIES, labels = c('Ukraine', 'Russia', 'Belarus', 'Kazakhstan')),
+           language = factor(lang_labels[name], levels = names(LANG_COLS)))
+
   # plot
   message('plotting trends')
-  agg_data %>%
-    # make percentage
-    mutate(percent = boot_m * 100,
-           ci_lower = boot_lower_ci * 100,
-           ci_upper = boot_upper_ci * 100) %>%
-    ggplot(aes(as.Date(date), percent, colour = name, fill = name)) +
-    geom_line() +
-    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper),  alpha = 0.3, color = NA)  +
-    geom_vline(xintercept = WAR_START, linetype = 'dashed') +
-    # set theme
-    theme_classic() +
-    scale_colour_manual(values = colour_pal) +
-    scale_fill_manual(values = colour_pal, guide = FALSE) +
-    scale_x_date(breaks = 'month', date_labels = "%b", date_breaks = "1 month") +  # Display only month names vertically
+  p <- agg_data %>%
+    ggplot(aes(date, percent, colour = language, fill = language)) +
+    geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), colour = NA, alpha = 0.3) +
+    geom_line(linewidth = 0.3) +
+    geom_vline(xintercept = WAR_START, linetype = 'dashed', linewidth = LW) +
+    scale_colour_manual(values = LANG_COLS, name = 'Sung language', drop = FALSE) +
+    scale_fill_manual(values = LANG_COLS, guide = 'none', drop = FALSE) +
+    labs(x = NULL, y = 'Sung language (%)') +
+    strip_box +
     theme(legend.position = ifelse(legend, 'bottom', 'none')) +
-    labs(x = '', y = 'Proportion (%)', colour = 'Lyrics Language', 'Register country (ISRC)') +
-    facet_wrap(~ country_code, nrow = ifelse(study_window, 1, 4)) +
-    # if longitudinal, add line breaks
+    # if longitudinal, add line breaks for the six-month bins
     {if(!study_window) geom_vline(xintercept = c(WAR_START - 90, WAR_START + 90, WAR_START + 272, WAR_START + 455, WAR_START + 630),
-                                  colour = 'gray50', alpha = 0.5)}
+                                  colour = 'gray50', alpha = 0.5, linewidth = LW)}
 
-  
+  source_data <- agg_data %>% select(country, language, date, mean = percent, lower_95ci = ci_lower, upper_95ci = ci_upper)
+
   # save plot
   if(study_window){
-    plot_save(sprintf('%s/lyrics_lang_postsoviet_6month', save_path), c(183, 60))
+    p <- p + date_x + facet_wrap(~ country, nrow = 1) + scale_y_continuous(limits = c(0, 70), breaks = seq(0, 60, 20))
+    plot_save(sprintf('%s/lyrics_lang_postsoviet_6month', save_path), c(FULL_W, 50), source_data, p)
   } else {
-    plot_save(sprintf('%s/lyrics_lang_postsoviet_2years', save_path), c(183, 180))
+    p <- p + scale_x_date(date_breaks = '1 month', date_labels = '%b') + facet_wrap(~ country, nrow = 4)
+    plot_save(sprintf('%s/lyrics_lang_postsoviet_2years', save_path), c(FULL_W, 180), source_data, p)
   }
-  
-  # return aggregated data for stats
+
+  # return aggregated data
   return(agg_data)
 }
 
-# make plots for main and save the data
-lyrics_study <- long_trend_plot_stat(long_boot_output, 'Main', study_window = TRUE, FALSE)
-lyrics_long <- long_trend_plot_stat(long_boot_output, 'SI', study_window = FALSE, TRUE)
+# make plots for main and SI
+lyrics_study <- long_trend_plot_stat(long_boot_fill, 'Main', study_window = TRUE, legend = FALSE)
+lyrics_long <- long_trend_plot_stat(long_boot_fill, 'SI', study_window = FALSE, legend = TRUE)
 
 
 ################################################################################
 # TREND STATS
 ################################################################################
-# compute the pre vs. post increase/decrease percentage. Use cohen's d for effect size measure
-lyrics_change <- long_boot_output %>%
+# Pre- vs post-invasion change, bootstrapped over songs within day.
+# Effect size: Cohen's d across days in each bootstrap replicate; reported as bootstrap mean, 95% CI, z and P.
+lyrics_change <- long_boot_fill %>%
   filter(date >= WAR_START - 90, date <= WAR_START + 90) %>%
-  mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post')) 
+  mutate(pre_post = ifelse(date < WAR_START, 'pre', 'post'))
 
-# report change in percentage stats in the main text
+# number of days per period
+lyrics_change %>% filter(boot == 1, name == 'ru') %>% count(country_code, pre_post)
+
+# series reported in the main text
+reported <- tribble(~country_code, ~name,
+                    'UA', 'uk', 'UA', 'ru',
+                    'RU', 'ru', 'RU', 'uk',
+                    'BY', 'ru', 'BY', 'uk',
+                    'KZ', 'ru', 'KZ', 'kk')
+
+# pre and post mean percentage
 lyrics_change_pre_post <- lyrics_change %>%
+  semi_join(reported, by = c('country_code', 'name')) %>%
   group_by(boot, country_code, name, pre_post) %>%
-  summarise(m_prop = mean(prop) * 100) %>%
-  ungroup()
-
-lyrics_change_pre_post <- lyrics_change_pre_post %>%
+  summarise(m_prop = mean(prop) * 100, .groups = 'drop') %>%
   group_by(country_code, name, pre_post) %>%
   reframe(get_boot_mean_ci(m_prop, 'prop'))
+print(lyrics_change_pre_post, n = Inf, width = Inf)
 
-# report Russian lyrics in May
-lyrics_change %>%
-  filter(country_code == 'RU', name == 'ru', date >= '2022-05-01', date < '2022-06-01') %>%
-  reframe(get_boot_mean_ci(prop * 100, 'm_prop'))
-
-# report effect sizes
+# effect sizes
 lyrics_change_effect <- lyrics_change %>%
-  filter((country_code == 'UA' & name == 'uk') |
-           (country_code == 'UA' & name == 'ru') |
-           (country_code == 'RU' & name == 'ru') |
-           (country_code == 'KZ' & name == 'ru') |
-           (country_code == 'BY' & name == 'ru')
-  )
-
-# make dataframe wide
-lyrics_change_effect <- lyrics_change_effect %>%
-  select(country_code, name, pre_post, boot, prop) %>%
-  pivot_wider(names_from = pre_post, values_from = prop)
-
-lyrics_change_effect <- lyrics_change_effect %>%
+  semi_join(reported, by = c('country_code', 'name')) %>%
   group_by(boot, country_code, name) %>%
-  summarise(get_t_stat(post %>% unlist(), pre %>% unlist())) %>%
-  ungroup()
-
-# get cohen'D bootstrap
-lyrics_change_effect %>%
+  summarise(get_t_stat(prop[pre_post == 'post'], prop[pre_post == 'pre']), .groups = 'drop') %>%
   group_by(country_code, name) %>%
   reframe(get_boot_mean_ci(cohensD, 'd'))
+print(lyrics_change_effect, n = Inf, width = Inf)
 
+# Russia: Russian songs in May 2022 (CI of the monthly mean)
+lyrics_change %>%
+  filter(country_code == 'RU', name == 'ru', date >= as.Date('2022-05-01'), date < as.Date('2022-06-01')) %>%
+  group_by(boot) %>% summarise(m = mean(prop) * 100) %>%
+  reframe(get_boot_mean_ci(m, 'may_prop'))
+
+# Russia: Ukrainian songs in the first two weeks after the invasion
+lyrics_change %>%
+  filter(country_code == 'RU', name == 'uk', pre_post == 'post', date < WAR_START + 14) %>%
+  group_by(boot) %>% summarise(m = mean(prop) * 100) %>%
+  reframe(get_boot_mean_ci(m, 'first14d_prop'))

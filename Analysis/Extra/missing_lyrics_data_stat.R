@@ -9,7 +9,9 @@ source('utils.R')
 # DATA
 ################################################################################
 chart_data <- read_rds('Dataset/chart/longitudinal_postsoviet_chart.rds')
-gemini <- read_csv('Dataset/lyrics/gemini_postsoviet_lyrics.csv', show_col_types = FALSE)
+gemini <- read_csv('Dataset/lyrics/gemini_postsoviet_lyrics.csv', show_col_types = FALSE) %>%
+  arrange(desc(!is.na(language)), desc(confidence)) %>%
+  distinct(song_id, .keep_all = TRUE)
 
 sub_languages <- c('uk', 'ru', 'kk', 'en')
 
@@ -18,25 +20,29 @@ study_data <- chart_data %>% filter(study_window)
 ################################################################################
 # 1. ORIGINAL MISSING-LYRICS STATISTICS
 ################################################################################
+# A track is missing only if every appearance lacks a language label.
+# Do not retain an arbitrary first row or count multiple labels as multiple songs.
 original_songs <- study_data %>%
-  distinct(trackID, lyrics_lang, lyrics_lang_prob)
+  group_by(trackID) %>%
+  summarise(has_lyrics = any(!is.na(lyrics_lang)), .groups = 'drop')
 
 n_total <- nrow(original_songs)
-n_missing_orig <- sum(is.na(original_songs$lyrics_lang))
+n_missing_orig <- sum(!original_songs$has_lyrics)
 n_with_orig <- n_total - n_missing_orig
 
 cat(sprintf(
-  'Original data: %d unique songs in study window, %d (%.1f%%) with lyrics, %d (%.1f%%) missing\n',
+  'Original data: %d unique songs in study window, %d (%.2f%%) with lyrics, %d (%.2f%%) missing\n',
   n_total, n_with_orig, n_with_orig / n_total * 100,
   n_missing_orig, n_missing_orig / n_total * 100
 ))
 
 # per-country breakdown
 original_by_country <- study_data %>%
-  distinct(country_code, trackID, lyrics_lang) %>%
+  group_by(country_code, trackID) %>%
+  summarise(has_lyrics = any(!is.na(lyrics_lang)), .groups = 'drop') %>%
   group_by(country_code) %>%
   summarise(total = n(),
-            missing = sum(is.na(lyrics_lang)),
+            missing = sum(!has_lyrics),
             pct_missing = missing / total * 100,
             .groups = 'drop')
 cat('\nOriginal missing rate by country:\n')
@@ -46,7 +52,7 @@ print(original_by_country)
 # 2. GEMINI SUPPLEMENT RECOVERY
 ################################################################################
 missing_ids <- original_songs %>%
-  filter(is.na(lyrics_lang)) %>%
+  filter(!has_lyrics) %>%
   pull(trackID)
 
 gemini_matched <- gemini %>%
@@ -95,8 +101,7 @@ song_meta <- read_csv('Dataset/meta/song_metadata.csv', show_col_types = FALSE) 
   distinct(trackID, .keep_all = TRUE)
 
 joined <- original_songs %>%
-  left_join(song_meta, by = 'trackID') %>%
-  mutate(has_lyrics = !is.na(lyrics_lang))
+  left_join(song_meta, by = 'trackID')
 
 # preview audio and genre availability
 cat('\n--- Metadata availability by lyrics status ---\n')
@@ -122,8 +127,7 @@ popularity <- study_data %>%
   group_by(trackID) %>%
   summarise(n_appearances = n(), n_cities = n_distinct(nodeID),
             n_days = n_distinct(date), .groups = 'drop') %>%
-  left_join(original_songs %>% select(trackID, lyrics_lang), by = 'trackID') %>%
-  mutate(has_lyrics = !is.na(lyrics_lang))
+  left_join(original_songs, by = 'trackID')
 
 cat('\n--- Popularity by lyrics status ---\n')
 popularity %>%
@@ -142,9 +146,18 @@ print(wilcox.test(n_cities ~ has_lyrics, data = popularity))
 cat('\nChi-square: missing rate UA vs RU\n')
 ua_ru <- study_data %>%
   filter(country_code %in% c('UA', 'RU')) %>%
-  distinct(country_code, trackID, lyrics_lang) %>%
-  mutate(missing = is.na(lyrics_lang))
-print(chisq.test(table(ua_ru$country_code, ua_ru$missing)))
+  group_by(country_code, trackID) %>%
+  summarise(missing = all(is.na(lyrics_lang)), .groups = 'drop')
+missing_table <- table(ua_ru$country_code, ua_ru$missing)
+missing_test <- chisq.test(missing_table) # Yates continuity correction, as before
+# Independent multinomial sampling with country totals fixed; default BF prior.
+missing_bf <- BayesFactor::contingencyTableBF(
+  missing_table, sampleType = 'indepMulti', fixedMargin = 'rows')
+missing_rate_stats <- tibble(chi_squared = unname(missing_test$statistic),
+                             df = unname(missing_test$parameter), p = missing_test$p.value,
+                             BF01 = exp(-missing_bf@bayesFactor$bf[1]))
+print(missing_table)
+print(missing_rate_stats, width = Inf)
 
 ################################################################################
 # 3. ROBUSTNESS: RE-RUN MAIN SUNG-LANGUAGE TREND WITH SUPPLEMENTED DATA
@@ -166,19 +179,21 @@ chart_supplemented <- chart_data %>%
 
 # Verify improvement
 supp_study <- chart_supplemented %>% filter(study_window)
-supp_songs <- supp_study %>% distinct(trackID, lyrics_lang)
+supp_songs <- supp_study %>% group_by(trackID) %>%
+  summarise(has_lyrics = any(!is.na(lyrics_lang)), .groups = 'drop')
 cat(sprintf(
   '\nSupplemented study data: %d songs with lyrics_lang (was %d), %d still missing (was %d)\n',
-  sum(!is.na(supp_songs$lyrics_lang)), n_with_orig,
-  sum(is.na(supp_songs$lyrics_lang)), n_missing_orig
+  sum(supp_songs$has_lyrics), n_with_orig,
+  sum(!supp_songs$has_lyrics), n_missing_orig
 ))
 
 # per-country after supplement
 supp_by_country <- supp_study %>%
-  distinct(country_code, trackID, lyrics_lang) %>%
+  group_by(country_code, trackID) %>%
+  summarise(has_lyrics = any(!is.na(lyrics_lang)), .groups = 'drop') %>%
   group_by(country_code) %>%
   summarise(total = n(),
-            missing = sum(is.na(lyrics_lang)),
+            missing = sum(!has_lyrics),
             pct_missing = missing / total * 100,
             .groups = 'drop')
 cat('\nSupplemented missing rate by country:\n')
@@ -187,7 +202,11 @@ print(supp_by_country)
 ################################################################################
 # 4. BOOTSTRAP THE SUPPLEMENTED DATA (main 6-month window only)
 ################################################################################
-n_boot_supp <- 1000  # fewer iterations sufficient for robustness comparison
+SIMULATION <- FALSE # opt in to the expensive supplemented-data bootstrap
+n_boot_supp <- 1000
+supp_boot_path <- sprintf('Bootstraps/trend_lyrics_lang_gemini_supplemented_boot%s.rds', n_boot_supp)
+
+if (SIMULATION) {
 
 supp_clean <- chart_supplemented %>%
   ungroup() %>%
@@ -220,9 +239,19 @@ for (b in seq_len(n_boot_supp)) {
   if (b %% 50 == 0) cat(sprintf('  %d / %d\n', b, n_boot_supp))
 }
 supp_boot_output <- do.call(rbind, supp_boot) %>% mutate(date = as.Date(date))
+write_rds(supp_boot_output, supp_boot_path)
+} else if (file.exists(supp_boot_path)) {
+  supp_boot_output <- read_rds(supp_boot_path)
+} else {
+  supp_boot_output <- NULL
+  message('Supplemented bootstrap not found; counts and bias checks complete. Set SIMULATION <- TRUE to generate it.')
+}
+
+if (!is.null(supp_boot_output)) {
 
 # aggregate and plot
-supp_agg <- filter_study_window(supp_boot_output) %>%
+supp_agg <- supp_boot_output %>%
+  filter(date >= WAR_START - 90, date <= WAR_START + 90) %>%
   group_by(date, country_code, name) %>%
   reframe(get_boot_mean_ci(prop, 'boot')) 
 
@@ -241,15 +270,15 @@ supp_agg <- supp_agg %>%
 
 colour_pal <- c(UKRAINE_COLOUR, RUSSIAN_COLOUR, KAZAKHSTAN_COLOUR, ENGLISH_COLOUR, 'gray')
 
-supp_agg %>%
+supp_source <- supp_agg %>%
   mutate(percent = boot_m * 100,
          ci_lower = boot_lower_ci * 100,
-         ci_upper = boot_upper_ci * 100) %>%
+         ci_upper = boot_upper_ci * 100)
+supp_plot <- supp_source %>%
   ggplot(aes(as.Date(date), percent, colour = name, fill = name)) +
   geom_line() +
   geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), alpha = 0.15, colour = NA) +
   geom_vline(xintercept = WAR_START) +
-  theme_classic() +
   scale_colour_manual(values = colour_pal) +
   scale_fill_manual(values = colour_pal, guide = 'none') +
   scale_x_date(breaks = 'month', date_labels = '%b') +
@@ -257,4 +286,6 @@ supp_agg %>%
   labs(x = '', y = 'Proportion (%)', colour = 'Lyrics language') +
   facet_wrap(~ country_code, nrow = 1)
 
-plot_save('SI/lyrics_lang_postsoviet_6month_gemini_supplemented', c(183, 70))
+plot_save('SI/lyrics_lang_postsoviet_6month_gemini_supplemented', c(180, 70),
+          data = supp_source, plot = supp_plot)
+}
