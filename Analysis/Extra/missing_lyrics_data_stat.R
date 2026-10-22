@@ -287,5 +287,5 @@ supp_plot <- supp_source %>%
   facet_wrap(~ country_code, nrow = 1)
 
 plot_save('SI/lyrics_lang_postsoviet_6month_gemini_supplemented', c(180, 70),
-          data = supp_source, plot = supp_plot)
+          data = supp_source, plot = supp_plot, source_name = 'Supplementary_Fig_11')
 }

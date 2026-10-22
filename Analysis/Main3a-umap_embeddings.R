@@ -103,8 +103,8 @@ umap_panel <- function(umap_df, lims, lang, col){
   one('pre', 'Pre-invasion') + (one('post', 'Post-invasion') + theme(axis.title.y = element_blank()))
 }
 lyrics_source <- umap_lyrics %>% select(trackID, country_code, lyrics_language, pre_post, umap1 = x, umap2 = y)
-plot_save('Main/umap_ukrainian_lyrics', c(HALF_W, 40), lyrics_source, umap_panel(umap_lyrics, lyrics_lims, 'uk', UKRAINE_COLOUR))
-plot_save('Main/umap_russian_lyrics', c(HALF_W, 40), lyrics_source, umap_panel(umap_lyrics, lyrics_lims, 'ru', RUSSIAN_COLOUR))
+plot_save('Main/umap_ukrainian_lyrics', c(HALF_W, 40), lyrics_source, umap_panel(umap_lyrics, lyrics_lims, 'uk', UKRAINE_COLOUR), source_name = 'Fig_3a_Ukraine')
+plot_save('Main/umap_russian_lyrics', c(HALF_W, 40), lyrics_source, umap_panel(umap_lyrics, lyrics_lims, 'ru', RUSSIAN_COLOUR), source_name = 'Fig_3a_Russia')
 
 ## JSD DISTANCE
 if(SIMULATION){
@@ -160,9 +160,9 @@ acoustic_kde <- function(lang) bind_rows(get_kde(umap_acoustic, lang, 'pre', aco
   mutate(pre_post = factor(pre_post, levels = c('pre', 'post')))
 acoustic_source <- umap_acoustic %>% select(trackID, lyrics_language, pre_post, umap1 = x, umap2 = y)
 plot_save('SI/umap_ukrainian_acoustic', c(150, 80), acoustic_source,
-          plot_umap_density(umap_acoustic, acoustic_kde('uk'), 'UA', acoustic_lims))
+          plot_umap_density(umap_acoustic, acoustic_kde('uk'), 'UA', acoustic_lims), source_name = 'Supplementary_Fig_4_Ukraine')
 plot_save('SI/umap_russian_acoustic', c(150, 80), acoustic_source,
-          plot_umap_density(umap_acoustic, acoustic_kde('ru'), 'RU', acoustic_lims))
+          plot_umap_density(umap_acoustic, acoustic_kde('ru'), 'RU', acoustic_lims), source_name = 'Supplementary_Fig_4_Russia')
 
 ## JSD DISTANCE
 if(SIMULATION){

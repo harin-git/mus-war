@@ -60,4 +60,4 @@ make_spread_map <- function(day) {
 spread_plot <- make_spread_map(0) + make_spread_map(10) + make_spread_map(30)
 plot_save('Main/song_spread_example', c(FULL_W, 38),
           song_spread_smp %>% select(nodeID, city_name, lat, lon, first_date = appear_date, day_since),
-          spread_plot)
+          spread_plot, source_name = 'Fig_1c')

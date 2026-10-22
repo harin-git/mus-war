@@ -158,9 +158,9 @@ war_plot <- war_traj %>%
 # save plot for main figure (Fig. 3c) or the SI control (Supplementary Fig. 3c)
 war_source <- war_traj %>% select(country, nclosest, date, mean, lower_95ci, upper_95ci)
 if(!control){
-  plot_save('Main/war_related_songs_proportion', c(65, 40), war_source %>% select(-nclosest), war_plot)
+  plot_save('Main/war_related_songs_proportion', c(65, 40), war_source %>% select(-nclosest), war_plot, source_name = 'Fig_3c')
 } else {
-  plot_save('SI/different_closest_words_for_war_related_songs', c(FULL_W, 60), war_source, war_plot)
+  plot_save('SI/different_closest_words_for_war_related_songs', c(FULL_W, 60), war_source, war_plot, source_name = 'Supplementary_Fig_3c')
 }
 
 # correlation of the daily proportion with date using two-tailed Pearson r(df), 95% CI, Bonferroni-corrected for two tests

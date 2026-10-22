@@ -102,7 +102,7 @@ chart_plot %>%
   strip_box +
   theme(legend.position = 'bottom')
 plot_save('Main/comparison_w_spotify_youtube', c(FULL_W, 50),
-          chart_plot %>% select(platform, country, language, date, mean, lower_95ci, upper_95ci))
+          chart_plot %>% select(platform, country, language, date, mean, lower_95ci, upper_95ci), source_name = 'Fig_2b')
 
 
 ################################################################################

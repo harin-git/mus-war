@@ -131,10 +131,10 @@ long_trend_plot_stat <- function(dt, save_path = c('Main', 'SI'), study_window =
   # save plot
   if(study_window){
     p <- p + date_x + facet_wrap(~ country, nrow = 1) + scale_y_continuous(limits = c(0, 70), breaks = seq(0, 60, 20))
-    plot_save(sprintf('%s/lyrics_lang_postsoviet_6month', save_path), c(FULL_W, 50), source_data, p)
+    plot_save(sprintf('%s/lyrics_lang_postsoviet_6month', save_path), c(FULL_W, 50), source_data, p, source_name = 'Fig_2a')
   } else {
     p <- p + scale_x_date(date_breaks = '1 month', date_labels = '%b') + facet_wrap(~ country, nrow = 4)
-    plot_save(sprintf('%s/lyrics_lang_postsoviet_2years', save_path), c(FULL_W, 180), source_data, p)
+    plot_save(sprintf('%s/lyrics_lang_postsoviet_2years', save_path), c(FULL_W, 180), source_data, p, source_name = 'Supplementary_Fig_1')
   }
 
   # return aggregated data

@@ -536,7 +536,7 @@ get_edges_within_regions = function(all_regions, pre_network, post_network){
 # Save the last (or given) plot at its printed size in mm: editable SVG, a PDF made from the SVG (for linked
 # placement in Illustrator), a 300-dpi PNG, and the plotted data as a source-data CSV when `data` is given.
 # Output goes to Plots/ (or the PLOT_DIR environment variable).
-plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last_plot(), pdf = TRUE){
+plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last_plot(), pdf = TRUE, source_name = NULL){
   root <- Sys.getenv('PLOT_DIR', 'Plots')
   f <- file.path(root, plot_name)
   dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
@@ -546,8 +546,13 @@ plot_save <- function(plot_name, size = c(FULL_W, 100), data = NULL, plot = last
   if (pdf) rsvg::rsvg_pdf(paste0(f, '.svg'), paste0(f, '.pdf'))
   ggsave(paste0(f, '.png'), plot, width = size[1], height = size[2], units = 'mm', dpi = 300, bg = 'white')
   if(!is.null(data)){
-    sd <- file.path(root, 'source_data'); dir.create(sd, showWarnings = FALSE)
-    write_csv(data, file.path(sd, paste0(gsub('/', '_', plot_name), '.csv')))
+    # Exploratory plots without a manuscript figure number are not release Source Data.
+    folder <- if (!is.null(source_name) && startsWith(source_name, 'Unnumbered_')) 'exploratory_data' else 'source_data'
+    sd <- file.path(root, folder); dir.create(sd, showWarnings = FALSE)
+    if (is.null(source_name)) stop('Provide an explicit figure-numbered source_name when saving Source Data.')
+    if (length(source_name) != 1L || grepl('[/\\\\]', source_name))
+      stop('source_name must be a filename stem, not a path.')
+    write_csv(data, file.path(sd, paste0(source_name, '.csv')))
   }
   check_panel(paste0(f, '.svg'), size[1], size[2])
   invisible(plot)

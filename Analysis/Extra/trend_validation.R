@@ -126,7 +126,7 @@ seasonal_plot <- ua_season_plot + other_season_plot + plot_layout(widths = c(1, 
 seasonal_source <- bind_rows(ua_seasons %>% filter(name == 'uk') %>% mutate(panel = 'Ukrainian'),
                              other_seasons %>% mutate(panel = 'Russian'))
 plot_save('SI/seasonal_effects_lyrics_trend', c(180, 50),
-          data = seasonal_source, plot = seasonal_plot)
+          data = seasonal_source, plot = seasonal_plot, source_name = 'Supplementary_Fig_2a')
 
 # Five reported same-month correlations, not all pairwise correlations (or date).
 # Bonferroni adjustment is across these five tests. Daily values are autocorrelated.
@@ -255,7 +255,7 @@ random_source <- bind_rows(
     reframe(get_boot_mean_ci(cohensD, 'cohen')) %>% mutate(series = 'random summary'),
   random_reference %>% mutate(series = 'observed'))
 plot_save('SI/random_fluctuations_lyrcs_trend', c(180, 50),
-          data = random_source, plot = random_plot)
+          data = random_source, plot = random_plot, source_name = 'Supplementary_Fig_2b')
 
 # Compare observed d with saved random-window draws, not a Gaussian z test.
 # Report raw empirical tail proportions and finite-simulation corrected P values;

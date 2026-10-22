@@ -32,7 +32,7 @@ world_city_map <- ggplot() +
 
 plot_save('Main/map_world_cities', c(90, 52),
           city_data %>% select(nodeID, city_name, country_code, country_name, worldbank_region, lat, lon),
-          world_city_map)
+          world_city_map, source_name = 'Fig_1a')
 
 # Fig. 1b: zoomed-in map of the Post-Soviet region
 post_soviet_cities <- city_data %>% filter(worldbank_region == "Post-Soviet")
@@ -50,4 +50,4 @@ post_soviet_map <- ggplot() +
 
 plot_save('Main/map_post_soviet_region', c(80, 46),
           post_soviet_cities %>% select(nodeID, city_name, country_code, lat, lon),
-          post_soviet_map)
+          post_soviet_map, source_name = 'Fig_1b')

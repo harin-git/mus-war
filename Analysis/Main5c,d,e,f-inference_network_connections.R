@@ -214,7 +214,7 @@ within_plot <- within_connect_change %>%
   scale_colour_identity()
 
 # save plot for SI
-plot_save('SI/connection_percent_change', c(120, 100), within_connect_change, within_plot)
+plot_save('SI/connection_percent_change', c(120, 100), within_connect_change, within_plot, source_name = 'Supplementary_Fig_8')
 
 
 ################################################################################
@@ -280,7 +280,7 @@ between_plot <- post_soviet_inout_agg %>%
   scale_fill_identity() +
   labs(y = 'Percentage change in number of edges (%)', x = '', title = '')
 
-plot_save('SI/post_soviet_w_other_regions_connection_change', c(120, 50), post_soviet_inout_agg, between_plot)
+plot_save('SI/post_soviet_w_other_regions_connection_change', c(120, 50), post_soviet_inout_agg, between_plot, source_name = 'Unnumbered_between_region_connections')
 
 
 # Inference uses one change per saved bootstrap, not a t-test across draws.
@@ -318,7 +318,7 @@ pe <- ggplot(lab(city), aes(new_edges, country, colour = country)) +
   labs(x = 'Number of new edges', y = NULL)
 plot_save('Fig5/e_new_edges_europe', c(75, 55),
            bind_rows(lab(city) %>% mutate(level = 'city'), lab(ctry) %>% mutate(level = 'country (bootstrap)')) %>%
-             select(level, country, city, direction, new_edges, mean, lower_95ci, upper_95ci), pe)
+             select(level, country, city, direction, new_edges, mean, lower_95ci, upper_95ci), pe, source_name = 'Fig_5e')
 
 # Country means and contrasts are paired by bootstrap ID (private s06/s12 method).
 country_draws <- se %>% mutate(Total = Outgoing + Incoming) %>% group_by(country_code, boot) %>%
@@ -352,4 +352,4 @@ pf <- ggplot() +
   scale_x_continuous(breaks = seq(0, 30, 10), labels = lon_lab) + scale_y_continuous(breaks = seq(45, 65, 5), labels = lat_lab) +
   theme_map_axes() + theme(legend.position = 'none', legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, 'mm'))
 plot_save('Fig5/f_europe_new_edges_map', c(88, 55),
-          es %>% select(country_code, city, from, lat, lon, new_incoming), pf)
+          es %>% select(country_code, city, from, lat, lon, new_incoming), pf, source_name = 'Fig_5f')

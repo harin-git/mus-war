@@ -79,8 +79,8 @@ plot_city_level <- function(country) {
 ua_plot <- plot_city_level('UA')
 ru_plot <- plot_city_level('RU')
 # Preserve the latest approved separate panels, not the older HEAD layout.
-plot_save('Main/UA_city_level_local_music', c(85, 45), ua_plot$data, ua_plot)
-plot_save('Main/RU_city_level_local_music', c(85, 45), ru_plot$data, ru_plot)
+plot_save('Main/UA_city_level_local_music', c(85, 45), ua_plot$data, ua_plot, source_name = 'Fig_4c_Ukraine')
+plot_save('Main/RU_city_level_local_music', c(85, 45), ru_plot$data, ru_plot, source_name = 'Fig_4c_Russia')
 
 ################################################################################
 # UKRAINE — corrected baseline and paired bootstrap contrasts (s07/s10)

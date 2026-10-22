@@ -162,10 +162,10 @@ for (country in c('UA', 'RU')) {
       transmute(country, period = groups.use, term, zetarank, countrank)
     if(translated){
       plot_save(sprintf('Main/%s_lyrics_%s_wordcloud', country, pp), c(44, 26), cloud_data,
-                make_wordcloud(zeta_rank, pp, word_colour))
+                make_wordcloud(zeta_rank, pp, word_colour), source_name = sprintf('Fig_3b_%s_%s', country, pp))
     } else {
       plot_save(sprintf('SI/original_%s_lyrics_%s_wordcloud', country, pp), c(100, 80), cloud_data,
-                make_wordcloud(zeta_rank, pp, word_colour, max_size = 15))
+                make_wordcloud(zeta_rank, pp, word_colour, max_size = 15), source_name = sprintf('Supplementary_Fig_3a_%s_%s', country, pp))
     }
   }
 

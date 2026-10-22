@@ -94,9 +94,9 @@ if (TYPE == 'iw') {
   plot_save('Main/UA_music_survival_selfexpr_correlation', c(32, 40),
             matched$UA %>% select(music_city, lat, lon, local_music_change, survival_selfexpr, group),
             scatter_plot(matched$UA, 'survival_selfexpr', 'Survival vs\nself-expression',
-                         c(Occupied = UKRAINE_COLOUR, `Not occupied` = UKRAINE_COLOUR2)))
+                         c(Occupied = UKRAINE_COLOUR, `Not occupied` = UKRAINE_COLOUR2)), source_name = 'Fig_4b_Ukraine_scatter')
   plot_save('Main/RU_music_trad_secular_correlation', c(32, 40),
             matched$RU %>% select(music_city, lat, lon, local_music_change, trad_secular, group),
             scatter_plot(matched$RU, 'trad_secular', 'Traditional vs\nsecular-rational',
-                         c(`Minority region` = RUSSIAN_COLOUR, `Non-minority region` = RUSSIAN_COLOUR2)))
+                         c(`Minority region` = RUSSIAN_COLOUR, `Non-minority region` = RUSSIAN_COLOUR2)), source_name = 'Fig_4b_Russia_scatter')
 }

@@ -86,8 +86,8 @@ mus <- function(cc) read_rds(sprintf('Dataset/lyrics/%s_lyrics_change_by_city.rd
   mutate(abs_change = abs(pre_post_change / sum(pre + post)) * 100)
 a_ua <- map_panel('UA', mus('UA'), 'abs_change', c(UKRAINE_COLOUR, UKRAINE_COLOUR2), c('Smaller\nincrease','Larger\nincrease'), NULL)
 a_ru <- map_panel('RU', mus('RU'), 'abs_change', c(RUSSIAN_COLOUR2, RUSSIAN_COLOUR), c('Smaller\ndecline','Larger\ndecline'), NULL)
-plot_save('Main/UA_local_music_change_map', c(75, 62), a_ua$data, a_ua$plot)
-plot_save('Main/RU_local_music_change_map', c(HALF_W, 60), a_ru$data, a_ru$plot)
+plot_save('Main/UA_local_music_change_map', c(75, 62), a_ua$data, a_ua$plot, source_name = 'Fig_4a_Ukraine')
+plot_save('Main/RU_local_music_change_map', c(HALF_W, 60), a_ru$data, a_ru$plot, source_name = 'Fig_4a_Russia')
 
 ## b — Inglehart-Welzel maps (UA: survival vs self-expression; RU: traditional vs secular-rational)
 iw <- function(cc) read_rds(sprintf('Dataset/Inglehart_Welzel/%s_wvs_iw_scores.rds', cc))
@@ -95,5 +95,5 @@ b_ua <- map_panel('UA', iw('UA'), 'survival_selfexpr', c(UKRAINE_COLOUR, UKRAINE
                   quartile_before_crop = TRUE, marker_scale = 0.7, fill_limits = NULL)
 b_ru <- map_panel('RU', iw('RU'), 'trad_secular', c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2), c('Traditional','Secular-rational'), NULL,
                   quartile_before_crop = TRUE, marker_scale = 0.7, fill_limits = NULL)
-plot_save('Main/UA_iw_survival_selfexpr_map', c(45, 42), b_ua$data, b_ua$plot)
-plot_save('Main/RU_iw_trad_secular_map', c(50, 42), b_ru$data, b_ru$plot)
+plot_save('Main/UA_iw_survival_selfexpr_map', c(45, 42), b_ua$data, b_ua$plot, source_name = 'Fig_4b_Ukraine_map')
+plot_save('Main/RU_iw_trad_secular_map', c(50, 42), b_ru$data, b_ru$plot, source_name = 'Fig_4b_Russia_map')

@@ -100,7 +100,7 @@ pa <- ggplot(ga, aes(date, mean, colour = worldbank_region, fill = worldbank_reg
   scale_x_date(date_breaks = '1 month', date_labels = '%b %Y', expand = expansion(mult = 0.01)) +
   labs(x = NULL, y = 'Discovery similarity\nacross countries (z)') + theme(legend.position = 'none')
 plot_save('Fig5/a_similarity_over_time', c(100, 55),
-           ga %>% rename(region = worldbank_region) %>% left_join(pts %>% rename(region = worldbank_region, daily_mean_postsoviet = mean), by = c('region','date')), pa)
+           ga %>% rename(region = worldbank_region) %>% left_join(pts %>% rename(region = worldbank_region, daily_mean_postsoviet = mean), by = c('region','date')), pa, source_name = 'Fig_5a')
 
 
 ################################################################################
@@ -135,4 +135,4 @@ pb <- ggplot(d, aes(est, reorder(region, -est), colour = worldbank_region)) +
   scale_colour_manual(values = REGION_COLS, guide = 'none') +
   labs(x = "Pre vs. Post change\n(Cohen's d)", y = NULL)
 plot_save('Fig5/b_similarity_effect_size', c(55, 55),
-           d %>% select(region = worldbank_region, cohens_d = est, lower_95ci = lo, upper_95ci = hi, z, p = p_z), pb)
+           d %>% select(region = worldbank_region, cohens_d = est, lower_95ci = lo, upper_95ci = hi, z, p = p_z), pb, source_name = 'Fig_5b')
