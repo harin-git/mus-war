@@ -26,20 +26,6 @@ When running all analyses and reproducing the figures, `SIMULATION` parameter in
 
 All analysis scripts begin by loading study-wide packages and high-level functions through `utils.R`. Install the packages used by the relevant scripts before running them. See `session_info.txt` for the original analysis environment.
 
-### Figure exports
-
-Run each `Analysis/Main…` script from the repository root with `Dataset/` and `Bootstraps/` available. Each script contains its analysis and one plotting/export path. The shared settings, statistical summaries and `plot_save()` are in `utils.R`.
-
-`plot_save()` writes an editable SVG, a PDF generated from that SVG, a 300-dpi PNG and the plotted data as a CSV. Source Data names are explicitly set in each script with `source_name`, independently of artwork filenames, for example `Fig_2a.csv`, `Fig_4c_Ukraine.csv` and `Supplementary_Fig_4_Russia.csv`. Exploratory plots without a manuscript figure number write to `exploratory_data/`, not the numbered Source Data folder. Outputs go to `Plots/Main/`, `Plots/SI/` and `Plots/source_data/`; set `PLOT_DIR` to use another directory. Statistical results are printed by the relevant analysis script. `Main3d-acoustic_features.R` reports the 16 song-level feature comparisons with Bonferroni correction and Bayes factors, without producing a figure.
-
-Plotting packages include `svglite`, `rsvg`, `sf`, `maps`, `uwot`, `quanteda`, `ggwordcloud`, `philentropy`, `MASS` and `patchwork`. `BayesFactor` is used for evidence about null results. UMAP coordinates and word clouds use fixed seeds; UMAP uses one thread. Saved bootstrap inputs must match the current data and code. In particular, the acoustic JSD bootstrap uses kernel width 1 and UMAP seed 42.
-
-`Dataset/`, `Bootstraps/`, `out/`, `Plots/` and `logs/` are local inputs/outputs excluded from git. Running the scripts does not upload them. Editorial diagnostics and working audit scripts are not part of this repository.
-
-All visualisations are produced using `ggplot2`, except the diffusion networks in Fig. 5c,d, which are exported separately from [Gephi](https://gephi.org/). Manual figure assembly, illustrations and labels added outside R are not recreated by the runner.
-
-To infer the diffusion network, [NETINF](https://snap.stanford.edu/netinf/) needs to be installed. Once installed and pointed to the right path, `Main5c,d-infer_diffusion_network.R` function can be used as a wrapper to augment the raw data and format the cascades as input to NETINF.
-
 ## Codebook
 
 ### General
