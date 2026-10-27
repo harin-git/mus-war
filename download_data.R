@@ -2,10 +2,8 @@
 require(osfr)
 source('utils.R')
 
-# Choose between the two options to fetch data.
-# download without bootstrapped outcomes (3.27GB)
-download_data(bootstrapped_data = FALSE)
-
-# download with bootstrapped outcomes (5.30GB). Necessary to reproduce results by saving time.
+# Download once, including saved bootstraps for reproduction without recomputing them.
+# To download only Dataset, change TRUE to FALSE in this call.
+# Run in the repository root before Dataset or Bootstraps folders exist.
 download_data(bootstrapped_data = TRUE)
 

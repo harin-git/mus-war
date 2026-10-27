@@ -5,7 +5,10 @@
 source('utils.R')
 
 SIMULATION <- FALSE # if FALSE, pre-computed bootstrap is loaded
+n_boot <- 1000
 
+# Private chart/lyrics inputs are needed only to regenerate the bootstrap.
+if(SIMULATION){
 ################################################################################
 # DATA PREPARATION
 ################################################################################
@@ -40,9 +43,6 @@ chart_clean <- chart %>%
     )) 
 
 # perform bootstrap across the songs on each day
-n_boot <- 1000
-
-if(SIMULATION){
   boot_store = list()
   for (b in 1:n_boot) {
     smp <- chart_clean %>% 

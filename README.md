@@ -14,7 +14,7 @@ Interactive visualizations of figures in the paper can be found on [our website]
 
 For faster performance, we recommend manually downloading all datasets (folders "Bootstraps" and "Dataset") from the OSF repository by following [this link](https://osf.io/ra38k/?view_only=32795758b14040cdb826d743023308fd). Once downloaded, unzip the folders and place them in the main working directory alongside the analysis scripts.
 
-You can also download the data using the helper function `download_data.R`, which allows to automatically fetch data from the OSF repository using the [osfr](https://cran.r-project.org/web/packages/osfr/vignettes/getting_started.html) R package. You can define which type of data to download, corresponding directories will be created, and the download process will begin. Note, this can be slow depending on your region.
+You can also run `Rscript download_data.R` from the repository root to fetch data from OSF using the [osfr](https://cran.r-project.org/web/packages/osfr/vignettes/getting_started.html) R package. The script downloads once, including saved bootstrap outcomes by default. To download only Dataset, change the single call to `download_data(bootstrapped_data = FALSE)`. Run it before the `Dataset/` or `Bootstraps/` folders exist; the helper refuses to overwrite existing folders. Note, this can be slow depending on your region.
 
 ## Reproducing the analyses and plots
 
