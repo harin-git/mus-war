@@ -10,7 +10,7 @@ require(rnaturalearth) # for world map
 # PREPARATION
 ################################################################################
 # determine country of analysis
-COUNTRY_CODE <- 'UA'
+COUNTRY_CODE <- Sys.getenv('COUNTRY_CODE', 'UA') # 'UA' or 'RU'
 NQUANTILE <- 4
 
 # load data
@@ -32,15 +32,21 @@ switch(COUNTRY_CODE,
          WHERE <- 'Russian'
          CENSUS_SAVE <- 'SI/russia_census_ethnic_map'
          COR_SAVE <- 'SI/russia_music_census'
-         CENSUS_RAW <- read.csv('Dataset/census/russia_census_2021.csv') %>% select(-name_ru)
+         CENSUS_RAW <- read.csv('Dataset/census/russia_census_2021.csv')
          # filter proportion with russian ethnicity "Русские"
-         CENSUS <- CENSUS_RAW %>% filter(nationality == "Русские")
+         # Arkhangelsk and Tyumen regions are listed with and without their autonomous okrugs ("без АО").
+         # The map polygons exclude the okrugs, so keep one row per region.
+         CENSUS <- CENSUS_RAW %>% filter(nationality == "Русские") %>%
+           group_by(iso_3166_2) %>% filter(n() == 1 | grepl('без АО', name_ru)) %>% ungroup() %>%
+           select(-name_ru)
+         CENSUS_RAW <- CENSUS_RAW %>% select(-name_ru)
          # calculate russian proportion
          CENSUS <- CENSUS %>% mutate(local_prop = n/nationality_indicated_population*100)
          COLOR_GRADIENT <- c(RUSSIAN_COLOUR, RUSSIAN_COLOUR2)
          MUSIC <- read_rds('Dataset/lyrics/russian_lyrics_change_by_city.rds')
        }
 )
+stopifnot(!anyDuplicated(CENSUS$iso_3166_2))
 local_songs_city <- MUSIC %>%
   left_join(city_meta %>% select(nodeID, city_name, lat, lon))
 
@@ -61,17 +67,20 @@ if(COUNTRY_CODE == "UA"){
   russian_regions <- read_rds('Dataset/census/russian_regions_map.rds')
 
   # update ukraine regions including crimea
-  region <- ukraine_regions %>% bind_rows(russian_regions %>% filter(iso_3166_2 %in% c('UA-43', 'UA-40')))
+  region_all <- ukraine_regions %>% bind_rows(russian_regions %>% filter(iso_3166_2 %in% c('UA-43', 'UA-40')))
+  region <- region_all
 } else {
   russian_regions <- ne_states(country = 'Russia', returnclass = "sf") %>% select(iso_3166_2, name, name_ru, geometry)
 
-  region <- russian_regions %>% 
-    filter(!iso_3166_2 %in% c('UA-43', 'UA-40'))  %>%
-    sf::st_crop(xmin = 20, xmax = 100, ymin = 40, ymax = 62)   # crop map
+  region_all <- russian_regions %>% 
+    filter(!iso_3166_2 %in% c('UA-43', 'UA-40'))
+  # crop for display only; cities east of the crop are still matched to their region
+  region <- region_all %>% sf::st_crop(xmin = 20, xmax = 100, ymin = 40, ymax = 62)
 }
 
 # Transform geometries to the specified CRS
 region <- st_transform(region, CRS) 
+region_all <- st_transform(region_all, CRS)
 
 # join ethnic data 
 plot_data <- region %>% left_join(CENSUS, by = 'iso_3166_2')
@@ -109,8 +118,8 @@ city_points <- local_songs_city %>%
   select(city_name, lon, lat) %>%
   sf::st_as_sf(coords = c("lon", "lat"), crs = CRS)
 
-mapping <- sf::st_within(city_points, region) %>% as.character() %>% as.numeric()
-mapped_cities <- region[mapping, ] %>%
+mapping <- sapply(sf::st_within(city_points, region_all), function(i) if (length(i) == 1) i else NA_integer_)
+mapped_cities <- region_all[mapping, ] %>%
   as_tibble() %>%
   select(iso_3166_2) %>%
   mutate(nodeID = local_songs_city$nodeID,
@@ -118,11 +127,11 @@ mapped_cities <- region[mapping, ] %>%
   na.omit()
 
 city_music <- mapped_cities %>%
-  left_join(MUSIC)
+  left_join(MUSIC, by = 'nodeID')
 
-# join with ethnic data
+# join with ethnic data (one census row per region, so one row per city)
 music_ethnic <- city_music %>%
-  left_join(plot_data)
+  left_join(CENSUS, by = 'iso_3166_2')
 
 music_ethnic <- switch(COUNTRY_CODE,
                        UA = {
@@ -139,46 +148,56 @@ music_ethnic <- switch(COUNTRY_CODE,
                            mutate(city_type = ifelse(local_prop > 50, 'non-minority', 'minority')) %>%
                            filter(!is.na(city_type))
                        })  
+stopifnot(!anyDuplicated(music_ethnic$nodeID))
 
-# test correlation
+# test correlation: two-tailed Spearman, Fisher-z 95% CI
+spearman_stats <- function(x, y) {
+  ok <- complete.cases(x, y); n <- sum(ok)
+  ct <- cor.test(x[ok], y[ok], method = 'spearman', exact = FALSE)
+  ci <- tanh(atanh(unname(ct$estimate)) + c(-1, 1) * qnorm(0.975) / sqrt(n - 3))
+  tibble(n = n, df = n - 2, rho = unname(ct$estimate), lower_ci = ci[1], upper_ci = ci[2], p = ct$p.value)
+}
 message('Ethnic results...')
-cor_result <- corr.test(music_ethnic %>% select(pre_post_change, local_prop), adjust = 'bonferroni', method = 'spearman')
-print(cor_result, short=FALSE) 
-print(cor_result$stars, quote=FALSE, short=FALSE)
+print(spearman_stats(music_ethnic$pre_post_change, music_ethnic$local_prop), width = Inf)
 
 if(COUNTRY_CODE == 'UA'){
   message('Language results...')
-  cor_result <- corr.test(music_ethnic %>% select(pre_post_change, local_lang_prop), adjust = 'bonferroni', method = 'spearman')
-  print(cor_result, short=FALSE) 
-  print(cor_result$stars, quote=FALSE, short=FALSE)
+  print(spearman_stats(music_ethnic$pre_post_change, music_ethnic$local_lang_prop), width = Inf)
 }
 
 
 # plot the correlations between music and census
 music_ethnic %>%
   ggplot(aes(local_prop, pre_post_change * 100)) +
-  geom_smooth(method = 'glm', colour = 'gray50') +
+  geom_smooth(method = 'glm', formula = y ~ x, colour = 'gray50') +
   geom_point(aes(colour = city_type), size = 1, alpha = 0.8) +
-  ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman') +
+  ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman',
+                   size = BASE * PT) +
   switch (COUNTRY_CODE,
           UA = labs(x = 'Ethnic Ukranian (%)', y = 'Local music (%)'),
           RU = labs(x = 'Ethnic Russian (%)', y = 'Local music (%)') 
   ) +
-  scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = F)
+  scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = 'none')
 
-plot_save(COR_SAVE, c(80, 80))
+census_source <- music_ethnic %>%
+  select(nodeID, city_name, iso_3166_2, city_type, census_prop = local_prop, any_of('local_lang_prop'), pre_post_change) %>%
+  mutate(local_music_change = pre_post_change * 100)
+plot_save(COR_SAVE, c(80, 80), data = census_source %>% select(-any_of('local_lang_prop')),
+          source_name = ifelse(COUNTRY_CODE == 'UA', 'Supplementary_Fig_5a_ethnic', 'Supplementary_Fig_5b'))
 
 # if Ukraine, plot also the language correlation
 if(COUNTRY_CODE == 'UA'){
   music_ethnic %>%
     ggplot(aes(local_lang_prop, pre_post_change * 100)) +
-    geom_smooth(method = 'glm', colour = 'gray50') +
+    geom_smooth(method = 'glm', formula = y ~ x, colour = 'gray50') +
     geom_point(aes(colour = city_type), size = 1, alpha = 0.8) +
-    ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman') +
+    ggpubr::stat_cor(r.accuracy = 0.01, p.accuracy = 0.001,  cor.coef.name = 'rho', method = 'spearman',
+                     size = BASE * PT) +
     labs(x = 'Ukrainian speakers (%)', y = 'Local music (%)') +
-    scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = F)
+    scale_colour_manual(values = c(rev(COLOR_GRADIENT)), guide = 'none')
   
-  plot_save('SI/ukraine_music_census_language', c(80, 80))
+  plot_save('SI/ukraine_music_census_language', c(80, 80), data = census_source %>% select(-census_prop),
+            source_name = 'Supplementary_Fig_5a_language')
 }
 
 
